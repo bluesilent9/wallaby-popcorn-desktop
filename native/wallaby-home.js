@@ -26,19 +26,38 @@
     async function choose(card) {
         if (hovered === card) return;
         hovered = card; const ticket = ++generation, selectedAt = Date.now(); scheduler.cancel();
-        if (!card || isLibraryItem({Type:card.dataset.type,CollectionType:card.dataset.collectiontype})) { if (fallback()) scheduler.select(fallback(),0); return; }
+        if (!card || isLibraryItem({Type:card.dataset.type,CollectionType:card.dataset.collectiontype})) { if (fallback()) scheduler.select(fallback(),Math.max(0,1000-(Date.now()-selectedAt))); return; }
         try {
             const client = window.ApiClient, user = client?.getCurrentUserId?.();
             if (!user) return;
             const item = await client.getItem(user,card.dataset.id);
             if (ticket !== generation || !home()) return;
-            if (isLibraryItem(item)) { if (fallback()) scheduler.select(fallback(),0); return; }
+            if (isLibraryItem(item)) { if (fallback()) scheduler.select(fallback(),Math.max(0,1000-(Date.now()-selectedAt))); return; }
             const id = item.BackdropImageTags?.length ? item.Id : item.ParentBackdropItemId;
             const tag = item.BackdropImageTags?.[0] || item.ParentBackdropImageTags?.[0];
             const url = id && tag ? client.getImageUrl(id,{type:'Backdrop',maxWidth:2560,tag}) : fallback();
             if (url) scheduler.select(url,Math.max(0,1000-(Date.now()-selectedAt)));
         } catch (_) { /* Keep the loaded wallpaper while the connection recovers. */ }
     }
+    let fadeQueued = false;
+    const faded = new Set();
+    function updateContentFade() {
+        fadeQueued = false;
+        if (!home()) { for (const node of faded) node.classList.remove('wallaby-home-content-fade'); faded.clear(); return; }
+        const content = document.querySelector('main') || document.querySelector('.homePage, #homePage, .mainAnimatedPages');
+        const header = document.querySelector('.MuiAppBar-root > .MuiToolbar-root:first-child') || document.querySelector('.skinHeader');
+        if (!content || !header) return;
+        if (!content.classList.contains('wallaby-home-content-fade')) content.classList.add('wallaby-home-content-fade');
+        faded.add(content);
+        const edge = header.getBoundingClientRect().bottom - content.getBoundingClientRect().top;
+        for (const [name, value] of [['--wallaby-fade-start', `${Math.max(0, edge - 20)}px`], ['--wallaby-fade-end', `${Math.max(20, edge + 20)}px`]]) {
+            if (content.style.getPropertyValue(name) !== value) content.style.setProperty(name, value);
+        }
+    }
+    function scheduleFade() { if (!fadeQueued) { fadeQueued = true; requestAnimationFrame(updateContentFade); } }
+    window.addEventListener('scroll', scheduleFade, true); window.addEventListener('resize', scheduleFade);
+    new MutationObserver(scheduleFade).observe(document.documentElement, { childList:true, subtree:true });
+    window.addEventListener('hashchange', scheduleFade); scheduleFade();
     document.addEventListener('pointerover',event=>{
         if (!home() || event.pointerType === 'touch') return;
         choose(event.target.closest?.('.card[data-id], .listItem[data-id]') || null);
