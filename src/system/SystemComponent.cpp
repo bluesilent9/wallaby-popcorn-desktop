@@ -978,6 +978,8 @@ QString SystemComponent::getNativeShellScript()
     ":/web-client/extension/wallaby-desktop.js",
     ":/web-client/extension/wallaby-library-paging.js",
     ":/web-client/extension/wallaby-artwork.js",
+    ":/web-client/extension/wallaby-navigation.js",
+    ":/web-client/extension/wallaby-home.js",
     ":/web-client/extension/wallaby-library.js"
   };
 
