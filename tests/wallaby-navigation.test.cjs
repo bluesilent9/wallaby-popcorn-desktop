@@ -54,14 +54,14 @@ test('title focus, hover, controls and remembered rows navigate without scrollin
 });
 
 test('Home hover waits before fanart and returns to Wallaby artwork after leaving a title',{skip:!dependency},async t=>{
- const {JSDOM}=require(dependency);const dom=new JSDOM('<body><div class="card" data-id="film"></div><div class="card library" data-id="movies" data-type="CollectionFolder"></div></body>',{url:'http://[::1]:8096/web/#/home',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,tasks=[];
+ const {JSDOM}=require(dependency);const dom=new JSDOM('<body><header class="skinHeader"></header><div class="card" data-id="film"></div><div class="card library" data-id="movies" data-type="CollectionFolder"></div></body>',{url:'http://[::1]:8096/web/#/home',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,tasks=[];
  w.setTimeout=(fn,delay)=>{const task={fn,delay};tasks.push(task);return task;};w.clearTimeout=task=>{if(task)task.cancelled=true;};
  const loaded=[];w.Image=function(){const image=w.document.createElement('img');Object.defineProperty(image,'src',{set(url){image.setAttribute('src',url);loaded.push(url);Promise.resolve().then(()=>image.onload());}});return image;};
  w.jmpInfo={branding:{homeBackdrop:'wallaby.png'}};w.ApiClient={getCurrentUserId:()=> 'user',getItem:async()=>({Id:'film',BackdropImageTags:['tag']}),getImageUrl:()=> 'film.jpg'};
  for(const name of ['wallaby-artwork.js','wallaby-navigation.js','wallaby-home.js'])w.eval(source(name));
  const tick=()=>new Promise(r=>setTimeout(r,35));
  w.document.querySelector('.card').dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));await tick();assert.deepEqual(loaded,[]);assert.ok(tasks.at(-1).delay>900);
- await tasks.at(-1).fn();await tick();assert.deepEqual(loaded,['film.jpg']);assert.equal(w.document.querySelector('.wallaby-home-wallpaper img').getAttribute('src'),'film.jpg');
+ await tasks.at(-1).fn();await tick();assert.deepEqual(loaded,['film.jpg']);assert.equal(w.document.querySelector('.wallaby-home-wallpaper img').getAttribute('src'),'film.jpg');assert.equal(w.document.querySelector('.wallaby-home-header-wallpaper img').getAttribute('src'),'film.jpg');
  w.document.querySelector('.library').dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));assert.ok(tasks.at(-1).delay>900); assert.equal(loaded.at(-1),'film.jpg');await tasks.at(-1).fn();await tick();assert.equal(loaded.at(-1),'wallaby.png');
 });
 
