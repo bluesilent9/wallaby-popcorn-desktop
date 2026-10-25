@@ -1,3 +1,13 @@
+wallaby-popcorn (2.0.0-0wallaby3) UNRELEASED; urgency=medium
+
+  * Retain loaded fanart during selection and crossfade after one second.
+  * Add subdued Wallaby cinema artwork and transparent media toolbars.
+  * Virtualize standard library layouts as well as the cinema list; preserve
+    native filters and actions with bounded requests, rows and cache.
+  * Hide page ranges, filtered count badges and obsolete page-size settings.
+
+ -- Wallaby Suite <bluesilent9@users.noreply.github.com>  Mon, 26 Oct 2026 12:00:00 +1100
+
 wallaby-popcorn (2.0.0-0wallaby2) UNRELEASED; urgency=medium
 
   * Fix modern-library cinema rows and bounded scrolling beyond 100 titles.
