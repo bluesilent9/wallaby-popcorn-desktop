@@ -46,3 +46,7 @@ Before calling the DEB usable: inspect package contents/dependencies and ensure 
 ## Next development correction
 
 See [the IPv6 and cinema-view handover](ipv6-and-library-fix.md). The next DEB revision is `0wallaby2`; its source is prepared but must not be built before another reboot/authorization. It requires a matching one-key server forwarding migration when switching from the old desktop DEB. The Ubuntu launcher now requires libseccomp2 and uses the OS IPv6 resolver; direct IPv4 connections are disabled.
+
+## Next prepared revision
+
+See [desktop library polish](library-visual-polish.md). The next package is `2.0.0-0wallaby3~ubuntu26.04`, with source and browser-preview checks only. Stop before building until Dave reboots and authorizes it. GitHub Actions remain disabled.
