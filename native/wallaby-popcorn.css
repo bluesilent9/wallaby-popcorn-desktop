@@ -81,3 +81,17 @@
 .wallaby-language-badge { display:inline-flex; align-items:center; justify-content:center; min-width:2rem; height:1.8rem; padding:0 .4rem; border:1px solid hsl(var(--language-hue) 55% 62% / .7); background:hsl(var(--language-hue) 40% 25%); color:hsl(var(--language-hue) 65% 90%); border-radius:.3rem; font-size:.8rem; font-weight:650; }
 .wallaby-cinema-original-language { font-size:.9rem; line-height:1.7; margin-bottom:.7rem; }
 .wallaby-file-note { font-size:.75rem; color:#b8a8c3; line-height:1.5; margin:.6rem 0; }
+
+/* Own rows avoid modern Jellyfin card containment, absolute positioning and centred grid rules. */
+.wallaby-cinema-items { margin-inline:0 auto !important; align-self:flex-start !important; justify-self:start !important; text-align:left !important; position:relative !important; left:auto !important; transform:none !important; }
+.wallaby-cinema-items:not(.wallaby-cinema-virtualized) > .card { contain:none !important; position:relative !important; text-align:left !important; }
+.wallaby-cinema-items:not(.wallaby-cinema-virtualized) > .card > .wallaby-cinema-caption { position:relative !important; z-index:2; display:flex !important; visibility:visible !important; opacity:1 !important; }
+.wallaby-cinema-virtualized > .card { display:none !important; }
+.wallaby-virtual-library { display:block; width:100%; text-align:left; }
+.wallaby-cinema-row { display:flex; align-items:center; width:100%; height:64px; box-sizing:border-box; padding:.75rem 1rem; border-left:3px solid transparent; border-radius:.6rem; background:rgba(255,255,255,.025); color:#fff4d9; cursor:pointer; text-align:left; overflow:hidden; }
+.wallaby-cinema-row:hover, .wallaby-cinema-row:focus-visible { background:#30203e; outline:1px solid var(--wallaby-teal); }
+.wallaby-cinema-row.wallaby-cinema-selected { border-left-color:var(--wallaby-gold); background:#382545; }
+.wallaby-cinema-row .wallaby-cinema-caption { display:flex; width:100%; text-align:left; }
+.wallaby-cinema-row .wallaby-cinema-name { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; text-align:left; }
+.wallaby-cinema-row .wallaby-cinema-year { margin-left:auto; flex:none; }
+.wallaby-cinema-paging-hidden { display:none !important; }

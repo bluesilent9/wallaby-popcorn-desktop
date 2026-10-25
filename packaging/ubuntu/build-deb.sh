@@ -11,7 +11,9 @@ source /etc/os-release
 jobs=${WALLABY_BUILD_JOBS:-1}
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || { echo 'WALLABY_BUILD_JOBS must be a positive integer.' >&2; exit 1; }
 version=$(tr -d '\n\r ' < "$repo/VERSION")
-package_version="${version}-0wallaby1~ubuntu${VERSION_ID}"
+package_version="${version}-0wallaby2~ubuntu${VERSION_ID}"
+resolver_package=systemd-resolved
+[[ $VERSION_ID != 22.04 ]] || resolver_package=systemd
 build="$repo/build-ubuntu-${VERSION_ID}-amd64"
 stage="$build/package"
 args=()
@@ -35,6 +37,7 @@ rm -rf -- "$stage"
 DESTDIR="$stage" cmake --install "$build"
 install -Dm755 "$repo/packaging/ubuntu/wallaby-popcorn" "$stage/usr/bin/wallaby-popcorn"
 install -Dm755 "$repo/packaging/ubuntu/migrate-flatpak-data.py" "$stage/usr/share/wallaby-popcorn/migrate-flatpak-data.py"
+install -Dm755 "$repo/packaging/ubuntu/ipv6-launcher.py" "$stage/usr/share/wallaby-popcorn/ipv6-launcher.py"
 install -Dm644 "$repo/LICENSE" "$stage/usr/share/doc/wallaby-popcorn/copyright"
 install -Dm644 "$repo/README-WALLABY.md" "$stage/usr/share/doc/wallaby-popcorn/README.md"
 for license in "$repo"/external/mpvqt/LICENSES/*; do
@@ -56,7 +59,7 @@ Maintainer: Wallaby Suite <bluesilent9@users.noreply.github.com>
 Section: video
 Priority: optional
 Homepage: https://github.com/bluesilent9/wallaby-popcorn-desktop
-Depends: $shlibs, openssh-client, python3, qml6-module-qtquick, qml6-module-qtwebengine, qml6-module-qtwebchannel, qml6-module-qtquick-controls, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-templates
+Depends: $shlibs, openssh-client, python3, libseccomp2, $resolver_package, qml6-module-qtquick, qml6-module-qtwebengine, qml6-module-qtwebchannel, qml6-module-qtquick-controls, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-templates
 Recommends: qt6-wayland
 Installed-Size: $(du -sk "$stage/usr" | cut -f1)
 Description: Wallaby Popcorn desktop media client with built-in SSH tunnelling

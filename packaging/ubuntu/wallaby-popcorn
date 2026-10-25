@@ -2,4 +2,4 @@
 set -eu
 # Import per-user data before Qt creates its new profile folders.
 python3 /usr/share/wallaby-popcorn/migrate-flatpak-data.py
-exec /usr/lib/wallaby-popcorn/wallaby-popcorn "$@"
+exec python3 /usr/share/wallaby-popcorn/ipv6-launcher.py /usr/lib/wallaby-popcorn/wallaby-popcorn "$@"

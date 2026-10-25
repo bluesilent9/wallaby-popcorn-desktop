@@ -67,7 +67,7 @@
     window.wallabyLibraryRoute = libraryRoute;
     let container, panel, toggle, selected, backdrop, backdropPage, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
     const visible = node => node && node.getClientRects().length && !node.closest('.hide, [hidden], [aria-hidden="true"]');
-    const cards = () => container ? [...container.querySelectorAll('.card[data-id]')] : [];
+    const cards = () => container ? [...container.querySelectorAll('.card[data-id], .wallaby-cinema-row[data-id]')] : [];
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
     function element(tag, className, text) {
         const node = document.createElement(tag); node.className = className;
@@ -105,12 +105,13 @@
         location.hash = `#/details?${params}`;
     }
     function caption(card) {
-        if (card.querySelector('.wallaby-cinema-caption')) return;
+        if (card.querySelector('.wallaby-cinema-caption') || card.classList.contains('wallaby-cinema-row')) return;
         const lines = [...card.querySelectorAll('.cardText')].map(node => node.textContent.trim()).filter(Boolean);
-        const title = lines[0] || card.querySelector('[title]')?.title || card.getAttribute('aria-label') || 'Untitled';
+        const model = window.wallabyLibraryPaging?.item(card.dataset.id);
+        const title = model?.Name || lines[0] || card.querySelector('[title]')?.title || card.getAttribute('aria-label') || 'Untitled';
         const node = element('span', 'wallaby-cinema-caption');
         node.append(element('span', 'wallaby-cinema-name', title));
-        if (lines[1]) node.append(element('span', 'wallaby-cinema-year', lines[1]));
+        if (model?.ProductionYear || lines[1]) node.append(element('span', 'wallaby-cinema-year', String(model?.ProductionYear || lines[1])));
         card.append(node);
     }
     function clearBackdrop() {
@@ -213,7 +214,7 @@
     }
     function intercept(event) {
         if (opening || !enabled || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-        const card = event.target.closest('.card[data-id]');
+        const card = event.target.closest('.card[data-id], .wallaby-cinema-row[data-id]');
         if (!card || !container.contains(card)) return;
         // Keep play, context menu, watched/favourite and selection controls native.
         if (event.target.closest('button, input, [data-action]:not([data-action="link"]), .cardOverlayButton')) return;
@@ -222,7 +223,7 @@
     function keyboard(event) {
         if (enabled && event.key === 'Enter' && selected && !event.target.closest('button, input, textarea, select')) { event.preventDefault(); event.stopImmediatePropagation(); openItem(selected); return; }
         if (!enabled || !['ArrowUp', 'ArrowDown'].includes(event.key) || event.target.closest('input, textarea, select, button')) return;
-        const rows = cards(); const index = rows.indexOf(selected);
+        const rows = cards().filter(visible); const index = rows.indexOf(selected);
         const next = rows[Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))];
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); (next.querySelector('a[href], [tabindex]') || next).focus({ preventScroll: true }); select(next); next.scrollIntoView({ block: 'nearest' }); }
     }
@@ -236,9 +237,9 @@
             panel = element('aside', 'wallaby-cinema-detail'); panel.setAttribute('aria-label', 'Selected title details');
             panel.setAttribute('aria-live', 'polite'); container.after(panel);
         }
-        cards().forEach(caption);
         window.wallabyLibraryPaging?.attach(container, select, openItem);
-        if (!selected?.isConnected || !container.contains(selected)) { selected = null; select(cards()[0]); }
+        cards().forEach(caption);
+        if (!selected?.isConnected || !container.contains(selected)) { selected = null; select(cards().find(visible)); }
         if (!cards().length) { clearBackdrop(); generation++; selected = null; setText(panel, 'No titles in this view. Try changing Jellyfin’s filters.'); }
         position();
     }

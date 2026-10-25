@@ -17,6 +17,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QNetworkAccessManager>
+#include "system/Ipv6NetworkPolicy.h"
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QEventLoop>
@@ -44,7 +45,7 @@ MprisComponent::MprisComponent(QObject* parent)
   , m_expectedPosition(0)
   , m_isNavigating(false)
   , m_playerState(PlayerComponent::State::finished)
-  , m_albumArtManager(new QNetworkAccessManager(this))
+  , m_albumArtManager(new Ipv6NetworkAccessManager(this))
   , m_pendingArtReply(nullptr)
 {
 }

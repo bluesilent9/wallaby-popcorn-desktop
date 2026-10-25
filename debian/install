@@ -2,3 +2,5 @@ packaging/ubuntu/wallaby-popcorn usr/bin
 packaging/ubuntu/migrate-flatpak-data.py usr/share/wallaby-popcorn
 README-WALLABY.md usr/share/doc/wallaby-popcorn
 external/mpvqt/LICENSES/* usr/share/doc/wallaby-popcorn/licenses/mpvqt
+
+packaging/ubuntu/ipv6-launcher.py usr/share/wallaby-popcorn/

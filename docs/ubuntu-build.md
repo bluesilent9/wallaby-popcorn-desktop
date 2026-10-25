@@ -42,3 +42,7 @@ Before calling the DEB usable: inspect package contents/dependencies and ensure 
 - [Qt 6.10 supported Linux configurations](https://doc.qt.io/qt-6.10/linux.html)
 - [Ubuntu 22.04 Qt6 WebEngine development package](https://packages.ubuntu.com/jammy/qt6-webengine-dev)
 - Upstream `CMakeModules/QtConfiguration.cmake` and `external/qt-wayland-compat.h`
+
+## Next development correction
+
+See [the IPv6 and cinema-view handover](ipv6-and-library-fix.md). The next DEB revision is `0wallaby2`; its source is prepared but must not be built before another reboot/authorization. It requires a matching one-key server forwarding migration when switching from the old desktop DEB. The Ubuntu launcher now requires libseccomp2 and uses the OS IPv6 resolver; direct IPv4 connections are disabled.

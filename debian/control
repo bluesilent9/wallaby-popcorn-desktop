@@ -14,7 +14,7 @@ Vcs-Browser: https://github.com/bluesilent9/wallaby-popcorn-desktop
 
 Package: wallaby-popcorn
 Architecture: amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}, openssh-client, python3,
+Depends: ${shlibs:Depends}, ${misc:Depends}, libseccomp2, systemd-resolved | systemd, openssh-client, python3,
          qml6-module-qtquick, qml6-module-qtwebengine, qml6-module-qtwebchannel,
          qml6-module-qtquick-controls, qml6-module-qtquick-window,
          qml6-module-qtqml-workerscript, qml6-module-qtquick-templates

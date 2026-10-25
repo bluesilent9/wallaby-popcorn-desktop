@@ -21,6 +21,8 @@
 
 #include "shared/Names.h"
 #include "system/SystemComponent.h"
+#include "system/Ipv6NetworkPolicy.h"
+#include <QQuickWebEngineProfile>
 #include <QDebug>
 #include "Paths.h"
 #include "player/CodecsComponent.h"
@@ -636,6 +638,7 @@ int main(int argc, char *argv[])
         WindowManager::Get().raiseWindow();
       });
     });
+    QQuickWebEngineProfile::defaultProfile()->setUrlRequestInterceptor(new Ipv6RequestInterceptor(&app));
     engine->load(QUrl(QStringLiteral("qrc:/ui/webview.qml")));
 
     // run our application

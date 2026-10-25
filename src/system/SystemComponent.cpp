@@ -14,6 +14,7 @@
 #include <QProcessEnvironment>
 #include <QLineEdit>
 #include <QHostAddress>
+#include "Ipv6NetworkPolicy.h"
 #include <QMap>
 #include <QtNetwork/qnetworkinterface.h>
 #include <QGuiApplication>
@@ -82,7 +83,7 @@ SystemComponent::SystemComponent(QObject* parent) : ComponentBase(parent), m_pla
     checkServerConnectivity(m_pendingConnectivityUrl);
   });
 
-  m_networkManager = new QNetworkAccessManager(this);
+  m_networkManager = new Ipv6NetworkAccessManager(this);
   connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &SystemComponent::stopSshTunnel);
 
 // define OS Type
@@ -236,35 +237,14 @@ QString SystemComponent::extractBaseUrl(const QString& url)
   QUrl parsedUrl(url);
   QString path = parsedUrl.path();
 
-  // Find last occurrence of "/web" in path only (case-insensitive)
-  int webIndex = path.toLower().lastIndexOf("/web");
-
-  if (webIndex >= 0) {
-    // Truncate path at /web
-    path = path.left(webIndex);
-
-    // Build URL without fragment/query
-    QString result = parsedUrl.scheme() + "://" + parsedUrl.host();
-    int port = parsedUrl.port();
-    if (port != -1 &&
-        !((parsedUrl.scheme() == "https" && port == 443) ||
-          (parsedUrl.scheme() == "http" && port == 80))) {
-      result += ":" + QString::number(port);
-    }
-    result += path;
-    return result;
-  }
-
-  // Fallback to origin (scheme://host:port, excluding default ports and userinfo)
-  QString origin = parsedUrl.scheme() + "://" + parsedUrl.host();
-  int port = parsedUrl.port();
-  // Only add port if non-default (443 for https, 80 for http)
-  if (port != -1 &&
-      !((parsedUrl.scheme() == "https" && port == 443) ||
-        (parsedUrl.scheme() == "http" && port == 80))) {
-    origin += ":" + QString::number(port);
-  }
-  return origin;
+  // Let QUrl retain IPv6 brackets and escaping instead of concatenating a bare host.
+  const int webIndex = path.toLower().lastIndexOf("/web");
+  parsedUrl.setPath(webIndex >= 0 ? path.left(webIndex) : QString());
+  if ((parsedUrl.scheme() == "http" && parsedUrl.port() == 80) || (parsedUrl.scheme() == "https" && parsedUrl.port() == 443)) parsedUrl.setPort(-1);
+  parsedUrl.setUserInfo(QString());
+  parsedUrl.setQuery(QString());
+  parsedUrl.setFragment(QString());
+  return parsedUrl.toString(QUrl::FullyEncoded);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -355,6 +335,14 @@ void SystemComponent::checkServerConnectivity(QString url)
     m_connectivityCheckReply = nullptr;
   }
 
+  if (QUrl(url).scheme().compare("ssh", Qt::CaseInsensitive) != 0 && !Ipv6NetworkPolicy::allows(QUrl(url)))
+  {
+    m_pendingConnectivityUrl.clear();
+    QMessageBox::warning(nullptr, tr("IPv6 required"), tr("Use ssh://username@hostname[:port] for the built-in tunnel, or an HTTP(S) URL with a literal IPv6 address in brackets. IPv4 addresses and direct HTTP hostname fallback are disabled."));
+    emit serverConnectivityResult(url, false, url);
+    return;
+  }
+
   // Store for retry
   m_pendingConnectivityUrl = url;
   const QString requestedUrl = url;
@@ -435,6 +423,7 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
   const QUrl address(rawUrl);
   const QString username = address.userName();
   const QString hostname = address.host();
+  QString transportHost = hostname;
   const int port = address.port(22);
   if (address.scheme().compare("ssh", Qt::CaseInsensitive) != 0 || username.isEmpty() || hostname.isEmpty() ||
       !address.password().isEmpty() || !address.path().isEmpty() || !address.query().isEmpty() || !address.fragment().isEmpty() ||
@@ -444,6 +433,35 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
     QMessageBox::warning(nullptr, tr("Invalid SSH server address"),
                          tr("Use ssh://username@hostname[:port] with no password or path."));
     return false;
+  }
+  QHostAddress numericHost(hostname);
+  if (numericHost.protocol() == QAbstractSocket::IPv4Protocol || Ipv6NetworkPolicy::isMapped(numericHost))
+  {
+    QMessageBox::warning(nullptr, tr("IPv6 required"), tr("IPv4 SSH addresses are not supported. Use an IPv6 address or a hostname with an AAAA record."));
+    return false;
+  }
+  if (numericHost.isNull())
+  {
+    // Ask the OS resolver over D-Bus. The app itself never needs an IPv4 DNS socket.
+    QProcess resolver;
+    resolver.start("resolvectl", {"query", "--type=AAAA", "--legend=no", "--", hostname});
+    if (!resolver.waitForStarted(3000) || !resolver.waitForFinished(12000))
+    {
+      resolver.kill(); resolver.waitForFinished(1000);
+      QMessageBox::warning(nullptr, tr("IPv6 name lookup failed"), tr("Could not query the system IPv6 resolver. Check systemd-resolved, or enter the server's IPv6 address."));
+      return false;
+    }
+    transportHost.clear();
+    for (const QString& token : QString::fromUtf8(resolver.readAllStandardOutput()).split(QRegularExpression("\\s+"), Qt::SkipEmptyParts))
+    {
+      QHostAddress candidate(token);
+      if (candidate.protocol() == QAbstractSocket::IPv6Protocol && !Ipv6NetworkPolicy::isMapped(candidate)) { transportHost = token; break; }
+    }
+    if (transportHost.isEmpty())
+    {
+      QMessageBox::warning(nullptr, tr("IPv6 name lookup failed"), tr("No usable IPv6 address was returned for this server. Check its AAAA record and your IPv6 connection. IPv4 fallback is disabled."));
+      return false;
+    }
   }
   qWarning() << "[Wallaby Popcorn SSH] Starting setup for" << username << "@" << hostname << "port" << port;
 
@@ -489,7 +507,7 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
   {
     qWarning() << "[Wallaby Popcorn SSH] Scanning SSH host key";
     QProcess scan;
-    scan.start("ssh-keyscan", {"-T", "8", "-p", QString::number(port), "-t", "ed25519", hostname});
+    scan.start("ssh-keyscan", {"-6", "-T", "8", "-p", QString::number(port), "-t", "ed25519", transportHost});
     if (!scan.waitForStarted(5000) || !scan.waitForFinished(12000))
     {
       qWarning() << "[Wallaby Popcorn SSH] Host key scan failed:" << scan.errorString() << scan.readAllStandardError();
@@ -511,7 +529,7 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
       const QList<QByteArray> fields = line.split(' ');
       if (fields.size() >= 3 && fields.at(1) == "ssh-ed25519")
       {
-        keyLine = line + '\n';
+        keyLine = (port == 22 ? hostname : QString("[%1]:%2").arg(hostname).arg(port)).toUtf8() + " " + fields.at(1) + " " + fields.at(2) + '\n';
         break;
       }
     }
@@ -613,10 +631,10 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
     env.insert("SSH_ASKPASS_REQUIRE", "force");
     if (!env.contains("DISPLAY")) env.insert("DISPLAY", ":0");
     ssh.setProcessEnvironment(env);
-    QStringList enrollArgs = {"-F", "/dev/null", "-T", "-p", QString::number(port), "-o", "StrictHostKeyChecking=yes", "-o",
+    QStringList enrollArgs = {"-6", "-F", "/dev/null", "-o", "HostKeyAlias=" + hostname, "-T", "-p", QString::number(port), "-o", "StrictHostKeyChecking=yes", "-o",
       "UserKnownHostsFile=" + knownHosts, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HostKeyAlgorithms=" + hostKeyAlgorithm, "-o",
       "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no", "-o", "NumberOfPasswordPrompts=1",
-      username + "@" + hostname, "/usr/local/libexec/jellyfin-ssh-enrol.py", "--trusted"};
+      username + "@" + transportHost, "/usr/local/libexec/jellyfin-ssh-enrol.py", "--trusted-ipv6"};
     ssh.start("ssh", enrollArgs);
     if (!ssh.waitForStarted(5000))
     {
@@ -660,7 +678,7 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
   }
   const quint16 localPort = static_cast<quint16>(20000 + (portSeed % 10000));
   QTcpServer portProbe;
-  if (!portProbe.listen(QHostAddress::LocalHost, localPort))
+  if (!portProbe.listen(QHostAddress::LocalHostIPv6, localPort))
   {
     qWarning() << "[Wallaby Popcorn SSH] Stable local port" << localPort << "is unavailable:" << portProbe.errorString();
     QMessageBox::critical(nullptr, tr("SSH tunnel error"),
@@ -669,10 +687,10 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
   }
   portProbe.close();
   m_sshTunnelProcess = new QProcess(this);
-  QStringList tunnelArgs = {"-F", "/dev/null", "-N", "-L", QString("127.0.0.1:%1:127.0.0.1:8096").arg(localPort), "-p", QString::number(port),
+  QStringList tunnelArgs = {"-6", "-F", "/dev/null", "-o", "HostKeyAlias=" + hostname, "-N", "-L", QString("[::1]:%1:[::1]:8096").arg(localPort), "-p", QString::number(port),
     "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-o",
     "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=" + knownHosts, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HostKeyAlgorithms=" + hostKeyAlgorithm,
-    "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", privateKey, username + "@" + hostname};
+    "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", privateKey, username + "@" + transportHost};
   m_sshTunnelProcess->start("ssh", tunnelArgs);
   qWarning() << "[Wallaby Popcorn SSH] Starting port-forward process";
   if (!m_sshTunnelProcess->waitForStarted(5000))
@@ -687,7 +705,7 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
   while (wait.elapsed() < 5000 && m_sshTunnelProcess->state() == QProcess::Running)
   {
     QTcpSocket probe;
-    probe.connectToHost(QHostAddress::LocalHost, localPort);
+    probe.connectToHost(QHostAddress::LocalHostIPv6, localPort);
     if (probe.waitForConnected(150)) { listening = true; probe.disconnectFromHost(); break; }
     QThread::msleep(50);
   }
@@ -700,7 +718,7 @@ bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
     return false;
   }
   m_sshTunnelAddress = rawUrl;
-  m_sshTunnelLocalUrl = QString("http://127.0.0.1:%1").arg(localPort);
+  m_sshTunnelLocalUrl = QString("http://[::1]:%1").arg(localPort);
   localUrl = m_sshTunnelLocalUrl;
   qWarning() << "[Wallaby Popcorn SSH] Tunnel is ready on" << m_sshTunnelLocalUrl;
   return true;
@@ -1035,7 +1053,7 @@ void SystemComponent::checkForUpdates()
 #ifndef DISABLE_UPDATE_CHECK
   if (SettingsComponent::Get().value(SETTINGS_SECTION_MAIN, "checkForUpdates").toBool()) {
 #if !defined(Q_OS_WIN) && !defined(Q_OS_MAC)
-    QNetworkAccessManager *manager = new QNetworkAccessManager(this);
+    QNetworkAccessManager *manager = new Ipv6NetworkAccessManager(this);
     QString checkUrl = "https://github.com/jellyfin/jellyfin-desktop/releases/latest";
     QUrl qCheckUrl = QUrl(checkUrl);
     qDebug() << QString("Checking URL for updates: %1").arg(checkUrl);

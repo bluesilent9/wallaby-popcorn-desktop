@@ -1,4 +1,5 @@
 #include "PlayerComponent.h"
+#include "system/Ipv6NetworkPolicy.h"
 #include <QString>
 #include <Qt>
 #include <QDir>
@@ -290,6 +291,7 @@ void PlayerComponent::setWindow(QQuickWindow* window)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool PlayerComponent::load(const QString& url, const QVariantMap& options, const QVariantMap &metadata, const QVariant& audioStream , const QVariant& subtitleStream)
 {
+  if (!Ipv6NetworkPolicy::allows(QUrl(url))) { qWarning() << "IPv6 policy blocked media URL"; return false; }
   stop();
   queueMedia(url, options, metadata, audioStream, subtitleStream);
   return true;
@@ -311,6 +313,7 @@ void PlayerComponent::queueMedia(const QString& url, const QVariantMap& options,
   updateVideoConfiguration();
 
   QUrl qurl = url;
+  if (!Ipv6NetworkPolicy::allows(qurl)) { qWarning() << "IPv6 policy blocked queued media URL"; return; }
   QString host = qurl.host();
 
   QVariantList command;

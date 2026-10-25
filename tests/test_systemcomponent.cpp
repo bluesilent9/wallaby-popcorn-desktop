@@ -15,6 +15,13 @@ void TestSystemComponent::testExtractBaseUrl_data()
   QTest::addColumn<QString>("input");
   QTest::addColumn<QString>("expected");
 
+  QTest::newRow("IPv6 loopback retains brackets")
+    << "http://[::1]:24123/web/index.html?test=1#/movies"
+    << "http://[::1]:24123";
+  QTest::newRow("IPv6 server and subpath retain brackets")
+    << "https://[2001:db8::1]:8920/jellyfin/web/"
+    << "https://[2001:db8::1]:8920/jellyfin";
+
   // Standard cases - URLs with /web
   QTest::newRow("https with /web at root")
     << "https://server.com/web/"
