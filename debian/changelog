@@ -1,3 +1,12 @@
+wallaby-popcorn (2.0.0-0wallaby7) UNRELEASED; urgency=medium
+
+  * Keep Standard View available while the native popover applies aria-hidden
+    to the library behind it; preserve per-library layout preferences.
+  * Replace Home's full-page scroll mask with a fixed header artwork strip,
+    keeping wallpaper aligned and allowing lower shelves to paint normally.
+
+ -- Wallaby Suite <bluesilent9@users.noreply.github.com>  Mon, 26 Oct 2026 21:00:00 +1100
+
 wallaby-popcorn (2.0.0-0wallaby6) UNRELEASED; urgency=medium
 
   * Add Standard View to Jellyfin's existing Grid/List view settings menu.
