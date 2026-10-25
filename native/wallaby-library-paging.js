@@ -24,7 +24,13 @@
         url.searchParams.set('limit', String(boundedQuery(query).Limit || boundedQuery(query).limit));
         return url.href;
     }
-    const helpers = { continuationQuery, queryFromUrl, boundedQuery, PAGE, ROW, CACHE_PAGES };
+    function queryIdentity(query) {
+        return JSON.stringify(Object.entries(continuationQuery(query, 0))
+            .filter(([key]) => !['userid', 'api_key'].includes(key.toLowerCase()))
+            .map(([key, value]) => [key.toLowerCase(), Array.isArray(value) ? value.join(',') : String(value)])
+            .sort(([a], [b]) => a.localeCompare(b)));
+    }
+    const helpers = { queryIdentity, continuationQuery, queryFromUrl, boundedQuery, PAGE, ROW, CACHE_PAGES };
     if (typeof module !== 'undefined' && module.exports) module.exports = helpers;
     if (typeof window === 'undefined') return;
     let captures = [], active, host, epoch = 0, queued = false, recovery = '';
@@ -133,17 +139,45 @@
             }
             return; // Wait for the real filter query; never substitute an unfiltered or truncated list.
         }
-        if (active?.capture === capture && host?.parentElement === container) {
+        const sameQuery = active && capture.client === active.capture.client && capture.user === active.capture.user &&
+            queryIdentity(capture.query) === queryIdentity(active.capture.query);
+        if (sameQuery && active.container === container) {
+            if (host?.parentElement !== container) {
+                // Jellyfin refreshes innerHTML on query updates. Reattach the viewport without discarding cached titles.
+                host?.remove(); host = document.createElement('div'); host.className = 'wallaby-virtual-library';
+                host.setAttribute('aria-label', `${active.total.toLocaleString()} library titles`); container.append(host);
+                active.dirty = true;
+                // Establish the saved scroll range before restoring the browser-clamped scroll offset.
+                host.style.height = `${Math.ceil(active.total / active.columns) * active.rowHeight}px`;
+                container.scrollTop = active.scrollTop || 0;
+            }
+            for (const original of originals) for (const node of [original, ...original.querySelectorAll('[data-id]')]) {
+                if (node.dataset.id) { node.dataset.wallabyOriginalId = node.dataset.id; delete node.dataset.id; }
+            }
+            // A refreshed SDK response is not a new library. Preserve its scroll/cache and loaded rows.
+            if (active.capture !== capture) {
+                active.capture = capture;
+                const start = Number(capture.query.StartIndex || 0), total = Number(capture.result.TotalRecordCount);
+                if (Number.isSafeInteger(total) && total >= 0 && active.total !== total) { active.total = total; active.dirty = true; }
+                if (start % PAGE === 0 && capture.result.Items.length >= Math.min(PAGE, active.total - start)) {
+                    const previous = cache.get(start);
+                    if (JSON.stringify(previous?.Items) !== JSON.stringify(capture.result.Items)) {
+                        cache.delete(start); cache.set(start, capture.result); active.dirty = true;
+                        while (cache.size > CACHE_PAGES) cache.delete(cache.keys().next().value);
+                    }
+                }
+            }
             const signature = `${container.className.split(/\s+/).filter(name => !name.startsWith('wallaby-')).join(' ')}|${originals[0]?.className}`;
             if (active.mode !== mode || active.signature !== signature || active.width !== Math.round(container.getBoundingClientRect().width)) {
-                active.mode = mode; active.signature = signature; measure(active, container, originals[0]); active.dirty = true; paint();
+                active.mode = mode; active.signature = signature; measure(active, container, originals[0]); active.dirty = true;
             }
+            if (active.dirty) paint();
             return;
         }
         reset();
         const total = Number(capture.result.TotalRecordCount);
         if (!Number.isSafeInteger(total) || total < 0) return;
-        active = { capture, total, onSelect, onOpen, mode, template: null, columns: 1, rowHeight: ROW, width: 0, signature: '', loading: false, failed: false, start: -1, end: -1 };
+        active = { container, scrollTop: container.scrollTop, capture, total, onSelect, onOpen, mode, template: null, columns: 1, rowHeight: ROW, width: 0, signature: '', loading: false, failed: false, start: -1, end: -1 };
         const initialStart = Number(capture.query.StartIndex || 0);
         if (initialStart % PAGE === 0 && capture.result.Items.length >= Math.min(PAGE, total - initialStart)) cache.set(initialStart, capture.result);
         host = document.createElement('div'); host.className = 'wallaby-virtual-library';
@@ -267,6 +301,7 @@
     }
     function paint() {
         if (!active || !host?.isConnected) return;
+        active.scrollTop = active.container.scrollTop;
         const state = active, columns = state.columns, height = state.rowHeight;
         const totalRows = Math.ceil(state.total / columns);
         const viewport = host.parentElement;
@@ -304,6 +339,7 @@
             content.append(row);
         }
         fragment.append(content, spacer(Math.max(0, totalRows - endRow) * height)); host.replaceChildren(fragment);
+        host.style.removeProperty('height');
         const wanted = state.pendingFocus ?? focusIndex;
         const target = wanted != null && host.querySelector(`[data-wallaby-index="${wanted}"][data-id]`);
         if (target) { state.pendingFocus = null; target.focus({ preventScroll: true }); }
@@ -330,8 +366,8 @@
         if (rowTop < viewport.scrollTop || rowTop + active.rowHeight > viewport.scrollTop + viewport.clientHeight) viewport.scrollTop = rowTop;
         active.pendingFocus = index; active.dirty = true; paint(); return true;
     }
-    function schedule() { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; paint(); }); } }
-    window.wallabyLibraryPaging = { install, attach, reset, clear, item, focusIndex, status: () => active ? { total: active.total, loading: active.loading } : { total: null, loading: true }, queryKey: () => active ? JSON.stringify(continuationQuery(active.capture.query, 0)) : '' };
+    function schedule() { if (active && host?.isConnected) active.scrollTop = active.container.scrollTop; if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; paint(); }); } }
+    window.wallabyLibraryPaging = { install, attach, reset, clear, item, focusIndex, status: () => active ? { total: active.total, loading: active.loading } : { total: null, loading: true }, queryKey: () => active ? queryIdentity(active.capture.query) : '' };
     window.addEventListener('scroll', schedule, true); window.addEventListener('resize', schedule); window.addEventListener('hashchange', clear);
     setInterval(() => install(window.ApiClient), 250); install(window.ApiClient);
 })();
