@@ -11,7 +11,7 @@ Run these on the target build environment, when build preparation is desired:
 ```sh
 sudo apt-get install build-essential cmake ninja-build pkg-config python3 dpkg-dev \
   qt6-base-dev qt6-base-private-dev qt6-declarative-dev qt6-webengine-dev \
-  qt6-wayland-dev libmpv-dev libcec-dev libxrandr-dev libgl-dev libegl-dev
+  qt6-wayland-dev libmpv-dev libcec-dev libsdl2-dev libminizip-dev libxrandr-dev libgl-dev libegl-dev
 
 git submodule update --init --recursive
 packaging/ubuntu/preflight.sh
