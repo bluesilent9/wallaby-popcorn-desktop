@@ -16,7 +16,8 @@ async function render(){const result=await ApiClient.getItems('sample-user',quer
 document.getElementById('search').oninput=event=>{query={...query,SearchTerm:event.target.value,StartIndex:0};render()};document.getElementById('sort').onchange=event=>{query={...query,SortOrder:event.target.value,StartIndex:0};render()};document.getElementById('filters').onclick=()=>alert('In the app this is Jellyfin’s existing filter dialog. This preview uses sample data.');document.getElementById('watched').onclick=event=>{event.target.classList.toggle('selected');query={...query,IsPlayed:event.target.classList.contains('selected')?false:undefined};render()};
 // Preview the same top-level menu structure as Jellyfin's ViewSettingsButton.
 document.getElementById('view-settings').onclick=()=>{
- const old=document.getElementById('selectview-popover');if(old){old.remove();return;}
+ const old=document.getElementById('selectview-popover');if(old){old.remove();document.querySelector('main').removeAttribute('aria-hidden');return;}
+ document.querySelector('main').setAttribute('aria-hidden','true');
  const popup=document.createElement('div');popup.id='selectview-popover';
  popup.style.cssText='position:fixed;right:24px;top:110px;z-index:100;background:#261636;border:1px solid #5c4166;border-radius:8px;padding:8px';
  popup.innerHTML='<ul role="menu" style="list-style:none;margin:0;padding:0"><li role="menuitem" tabindex="0" class="MuiMenuItem-root" data-mode="grid" style="padding:10px;cursor:pointer"><span class="MuiListItemIcon-root"></span>Grid View</li><li role="menuitem" tabindex="-1" class="MuiMenuItem-root" data-mode="list" style="padding:10px;cursor:pointer"><span class="MuiListItemIcon-root"></span>List View</li></ul>';
