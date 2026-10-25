@@ -18,6 +18,7 @@
 
     let identity = '';
     let administrator = false;
+    let userName = '';
     let lastCheck = 0;
     let pending = false;
 
@@ -27,7 +28,7 @@
     async function refreshPermission(force = false) {
         const client = window.ApiClient;
         const key = clientIdentity(client);
-        if (key !== identity) { identity = key; administrator = false; lastCheck = 0; }
+        if (key !== identity) { identity = key; administrator = false; userName = ''; lastCheck = 0; }
         if (!client?.getCurrentUser || !client.getCurrentUserId?.()) { administrator = false; return false; }
         if (!force && (pending || Date.now() - lastCheck < 30000)) return administrator;
         pending = true;
@@ -35,13 +36,34 @@
             const user = await client.getCurrentUser();
             if (clientIdentity(window.ApiClient) === key) {
                 administrator = canManageServer(user);
+                userName = String(user?.Name || '');
                 lastCheck = Date.now();
             }
         } catch (_) { administrator = false; }
         finally { pending = false; }
         return administrator;
     }
+    function renderHomeHeader() {
+        const home = window.wallabyNavigation?.isHome(location.hash);
+        const toolbar = document.querySelector('.MuiAppBar-root > .MuiToolbar-root:first-child') || document.querySelector('.skinHeader');
+        if (!toolbar) return;
+        // Keep the real ServerButton and user menu handlers; only decorate their presentation.
+        const server = [...toolbar.querySelectorAll('a[href]')].find(node => node.querySelector('img') && ['#/', '#/home', '/', '/home'].includes(node.getAttribute('href')));
+        if (server) for (const sibling of server.parentElement.children) {
+            const hide = home && sibling !== server;
+            if (sibling.classList.contains('wallaby-home-nav-hidden') !== hide) sibling.classList.toggle('wallaby-home-nav-hidden', hide);
+        }
+        const account = toolbar.querySelector('button[aria-controls="app-user-menu"], .headerUserButton');
+        if (!account) return;
+        const active = home && !!userName;
+        if (account.classList.contains('wallaby-user-box') !== active) account.classList.toggle('wallaby-user-box', active);
+        let label = account.querySelector('.wallaby-user-name');
+        if (!active) { label?.remove(); return; }
+        if (!label) { label = document.createElement('span'); label.className = 'wallaby-user-name'; account.append(label); }
+        if (label.textContent !== userName) label.textContent = userName;
+    }
     function renderControl() {
+        renderHomeHeader();
         const existing = document.getElementById('wallaby-manage-server');
         if (!administrator) { existing?.remove(); return; }
         const header = document.querySelector('.headerRight, .headerTop .headerRight');
