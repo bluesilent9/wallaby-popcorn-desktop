@@ -3,7 +3,7 @@
     const isLibraryItem = item => ['collectionfolder', 'userview', 'folder'].includes(String(item?.Type || '').toLowerCase()) || !!item?.CollectionType;
     if (typeof module !== 'undefined' && module.exports) module.exports = { isLibraryItem };
     if (typeof window === 'undefined') return;
-    let surface, hovered = null, generation = 0, cleanup;
+    let surface, headerFade, headerWallpaper, hovered = null, generation = 0, cleanup;
     const home = () => window.wallabyNavigation?.isHome(location.hash);
     const fallback = () => window.jmpInfo?.branding?.homeBackdrop;
     const scheduler = window.wallabyArtwork.createArtworkScheduler({
@@ -18,9 +18,16 @@
             }
             clearTimeout(cleanup);
             const images = [...surface.querySelectorAll('img')]; images.slice(0,-1).forEach(node=>node.remove());
-            const old = images.at(-1); surface.append(image); image.getBoundingClientRect();
-            requestAnimationFrame(()=>{ if (image.isConnected) { image.classList.add('wallaby-art-visible'); old?.classList.remove('wallaby-art-visible'); } });
-            cleanup = setTimeout(()=>old?.remove(),750);
+            updateHeaderFade();
+            const old = images.at(-1), oldHeader = headerWallpaper?.lastElementChild;
+            headerWallpaper?.querySelectorAll('img').forEach(node => { if (node !== oldHeader) node.remove(); });
+            const headerImage = image.cloneNode(true);
+            surface.append(image); headerWallpaper?.append(headerImage); image.getBoundingClientRect(); headerImage.getBoundingClientRect();
+            requestAnimationFrame(()=>{ if (image.isConnected) {
+                image.classList.add('wallaby-art-visible'); headerImage.classList.add('wallaby-art-visible');
+                old?.classList.remove('wallaby-art-visible'); oldHeader?.classList.remove('wallaby-art-visible');
+            } });
+            cleanup = setTimeout(()=>{ old?.remove(); oldHeader?.remove(); },750);
         }
     });
     async function choose(card) {
@@ -40,22 +47,25 @@
         } catch (_) { /* Keep the loaded wallpaper while the connection recovers. */ }
     }
     let fadeQueued = false;
-    const faded = new Set();
-    function updateContentFade() {
+    function updateHeaderFade() {
         fadeQueued = false;
-        if (!home()) { for (const node of faded) node.classList.remove('wallaby-home-content-fade'); faded.clear(); return; }
-        const content = document.querySelector('main') || document.querySelector('.homePage, #homePage, .mainAnimatedPages');
+        if (!home()) { headerFade?.remove(); headerFade = headerWallpaper = null; return; }
+        // Never mask/transform the scrolling page: Chromium can clip that huge layer
+        // to its initial raster bounds. Only this small, fixed overlay is masked.
         const header = document.querySelector('.MuiAppBar-root > .MuiToolbar-root:first-child') || document.querySelector('.skinHeader');
-        if (!content || !header) return;
-        if (!content.classList.contains('wallaby-home-content-fade')) content.classList.add('wallaby-home-content-fade');
-        faded.add(content);
-        const edge = header.getBoundingClientRect().bottom - content.getBoundingClientRect().top;
-        for (const [name, value] of [['--wallaby-fade-start', `${Math.max(0, edge - 20)}px`], ['--wallaby-fade-end', `${Math.max(20, edge + 20)}px`]]) {
-            if (content.style.getPropertyValue(name) !== value) content.style.setProperty(name, value);
+        if (!header) return;
+        if (!headerFade?.isConnected) {
+            headerFade = document.createElement('div'); headerFade.className = 'wallaby-home-header-fade'; headerFade.setAttribute('aria-hidden','true');
+            headerWallpaper = document.createElement('div'); headerWallpaper.className = 'wallaby-home-header-wallpaper';
+            surface?.querySelectorAll('img').forEach(image => headerWallpaper.append(image.cloneNode(true)));
+            headerFade.append(headerWallpaper); document.body.append(headerFade);
         }
+        const height = `${Math.max(0, header.getBoundingClientRect().bottom) + 20}px`;
+        if (headerFade.style.height !== height) headerFade.style.height = height;
     }
-    function scheduleFade() { if (!fadeQueued) { fadeQueued = true; requestAnimationFrame(updateContentFade); } }
-    window.addEventListener('scroll', scheduleFade, true); window.addEventListener('resize', scheduleFade);
+    function scheduleFade() { if (!fadeQueued) { fadeQueued = true; requestAnimationFrame(updateHeaderFade); } }
+    // Scrolling no longer rewrites a mask or shifts the artwork every frame.
+    window.addEventListener('resize', scheduleFade);
     new MutationObserver(scheduleFade).observe(document.documentElement, { childList:true, subtree:true });
     window.addEventListener('hashchange', scheduleFade); scheduleFade();
     document.addEventListener('pointerover',event=>{
@@ -68,6 +78,6 @@
     });
     window.addEventListener('blur',()=>{if(home()) choose(null);});
     window.addEventListener('hashchange',()=>{
-        generation++; hovered = null; scheduler.cancel(); clearTimeout(cleanup); surface?.remove(); surface=null;
+        generation++; hovered = null; scheduler.cancel(); clearTimeout(cleanup); surface?.remove(); surface=null; headerFade?.remove(); headerFade=headerWallpaper=null; scheduleFade();
     });
 })();
