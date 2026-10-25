@@ -9,7 +9,8 @@
     "(Shift\\+)?Up": "up",
     "(Shift\\+)?Down": "down",
     "(Return|Enter)": "enter",
-    "(Esc|Backspace)": {
+    "Esc": "back",
+    "Backspace": {
       "short": "back",
       "long": "exit"
     },
