@@ -91,10 +91,17 @@
         panel?.remove(); toggle?.remove(); container = panel = toggle = selected = null; selectedId = ''; lastQuery = '';
         document.body?.classList.remove('wallaby-library-active');
     }
+    function placeToggle() {
+        const toolbar = document.querySelector('.MuiAppBar-root > .MuiToolbar-root:nth-child(2)') || document.querySelector('.toolbar');
+        if (!toolbar || !toggle) return;
+        if (!toolbar.classList.contains('wallaby-library-toolbar')) toolbar.classList.add('wallaby-library-toolbar');
+        if (toggle.parentElement !== toolbar || toggle.previousElementSibling !== toolbar.firstElementChild) toolbar.insertBefore(toggle, toolbar.children[1] || null);
+    }
     function position() {
         if (!container) return;
+        placeToggle();
         const toolbar = [...document.querySelectorAll('.MuiToolbar-root.padded-left.padded-right, .libraryPage .pageTabContent .sectionTitleContainer, .toolbar')].filter(visible);
-        const top = Math.min(innerHeight * .35, Math.max(90, toggle?.getBoundingClientRect().bottom || 0, ...toolbar.map(node => node.getBoundingClientRect().bottom)) + 12);
+        const top = Math.min(innerHeight * .35, Math.max(56, toggle?.getBoundingClientRect().bottom || 0, ...toolbar.map(node => node.getBoundingClientRect().bottom)) + 12);
         document.body.style.setProperty('--wallaby-library-top', `${top}px`);
         const bounds = container.parentElement.getBoundingClientRect();
         const left = Math.max(24, bounds.left), width = Math.max(300, Math.min(innerWidth - left - 24, bounds.width || innerWidth - left * 2));
@@ -243,7 +250,7 @@
         if (!card || !container.contains(card)) return;
         // Keep play, context menu, watched/favourite and selection controls native.
         if (event.target.closest('button, input, [data-action]:not([data-action="link"]), .cardOverlayButton')) return;
-        event.preventDefault(); event.stopImmediatePropagation(); select(card);
+        event.preventDefault(); event.stopImmediatePropagation(); select(card); openItem(card);
     }
     const rowSelector = '.wallaby-cinema-row[data-id], .wallaby-virtual-card[data-id]';
     function focusTitle(event) {
