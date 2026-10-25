@@ -21,6 +21,9 @@ if [[ -n ${WALLABY_DEPS_PREFIX:-} ]]; then
  export PKG_CONFIG_PATH="$prefix/usr/lib/x86_64-linux-gnu/pkgconfig:$prefix/usr/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
  export LD_LIBRARY_PATH="$prefix/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
  args+=("-DCMAKE_PREFIX_PATH=$prefix/usr" "-DCMAKE_INCLUDE_PATH=$prefix/usr/include" "-DCMAKE_LIBRARY_PATH=$prefix/usr/lib/x86_64-linux-gnu")
+ # Debian's SDL and other development headers also use architecture-specific includes.
+ args+=("-DCMAKE_C_STANDARD_INCLUDE_DIRECTORIES=$prefix/usr/include;$prefix/usr/include/x86_64-linux-gnu"
+        "-DCMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=$prefix/usr/include;$prefix/usr/include/x86_64-linux-gnu")
 fi
 cmake -S "$repo" -B "$build" -GNinja -DCMAKE_BUILD_TYPE=Release \
  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_BINDIR=lib/wallaby-popcorn \
