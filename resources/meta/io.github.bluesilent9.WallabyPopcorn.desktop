@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Wallaby Popcorn
+Comment=Your Jellyfin library and server dashboard over an app-owned SSH tunnel
+Exec=wallaby-popcorn --desktop
+Icon=io.github.bluesilent9.WallabyPopcorn
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;
+Keywords=Jellyfin;Movies;TV;SSH;Popcorn;
+StartupWMClass=wallaby-popcorn

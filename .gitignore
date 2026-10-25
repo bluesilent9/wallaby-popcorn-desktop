@@ -29,3 +29,8 @@ debian/debhelper-build-stamp
 dist.zip
 obj-x86_64-linux-gnu/
 deployment/dist
+
+dist/
+debian/wallaby-popcorn/
+debian/wallaby-popcorn.substvars
+!packaging/ubuntu/build-deb.sh

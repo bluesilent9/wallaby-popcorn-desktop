@@ -53,8 +53,8 @@ QString Paths::resourceDir(const QString& file)
   QStringList possibleResourceDirs = {
     appResourceDir,
     appResourceDir + "../Resources/",
-    prefixDir + "/share/jellyfin-desktop/",
-    prefixDir + "/jellyfin-desktop/"
+    prefixDir + "/share/wallaby-popcorn/",
+    prefixDir + "/wallaby-popcorn/"
   };
 
   for (const auto& fileStr : possibleResourceDirs)
@@ -175,7 +175,7 @@ QString Paths::logDir(const QString& file)
 QString Paths::socketName(const QString& serverName)
 {
   QString profileId = g_activeProfileId.isEmpty() ? "default" : g_activeProfileId;
-  QString socketFile = QString("jellyfin-desktop.%1.%2").arg(profileId, serverName);
+  QString socketFile = QString("wallaby-popcorn.%1.%2").arg(profileId, serverName);
 
 #ifdef Q_OS_UNIX
   QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);

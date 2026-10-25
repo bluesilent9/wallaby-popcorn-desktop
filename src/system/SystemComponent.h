@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QNetworkReply>
 #include <QNetworkAccessManager>
+#include <QProcess>
 #include <QJSValue>
 #include "utils/Utils.h"
 #include "Paths.h"
@@ -54,6 +55,7 @@ public:
   Q_INVOKABLE QStringList networkAddresses() const;
 
   Q_INVOKABLE void openExternalUrl(const QString& url);
+  Q_INVOKABLE bool isManagementUrl(const QString& current, const QString& candidate) const;
 
   Q_INVOKABLE void runUserScript(QString script);
 
@@ -127,6 +129,8 @@ private:
 
   QSslConfiguration getSSLConfiguration();
   void setReplyTimeout(QNetworkReply* reply, int ms);
+  bool ensureSshTunnel(const QString& url, QString& localUrl);
+  void stopSshTunnel();
 
   QNetworkAccessManager* m_networkManager;
   PlatformType m_platformType;
@@ -137,6 +141,9 @@ private:
   qreal m_scale;
   QNetworkReply* m_connectivityCheckReply;
   QNetworkReply* m_resolveUrlReply;
+  QProcess* m_sshTunnelProcess = nullptr;
+  QString m_sshTunnelAddress;
+  QString m_sshTunnelLocalUrl;
   QTimer* m_connectivityRetryTimer;
   QString m_pendingConnectivityUrl;
 

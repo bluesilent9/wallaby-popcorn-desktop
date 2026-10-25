@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.bluesilent9.WallabyPopcorn</id>
+  <name>Wallaby Popcorn</name>
+  <summary>Jellyfin media and server management through an app-owned SSH tunnel</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+  <description><p>Wallaby Popcorn is an independent fork of Jellyfin Desktop. Browse and play your library, connect using an app-owned SSH tunnel, and access Jellyfin's server dashboard inside the desktop app with an administrator account.</p></description>
+  <launchable type="desktop-id">io.github.bluesilent9.WallabyPopcorn.desktop</launchable>
+  <url type="homepage">https://github.com/bluesilent9/wallaby-popcorn-desktop</url>
+  <content_rating type="oars-1.1" />
+</component>

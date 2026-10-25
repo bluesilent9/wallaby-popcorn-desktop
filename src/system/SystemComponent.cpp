@@ -1,8 +1,23 @@
 #include <QSysInfo>
 #include <QProcess>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QCryptographicHash>
+#include <QFileInfo>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QThread>
+#include <QElapsedTimer>
+#include <QTemporaryFile>
+#include <QProcessEnvironment>
+#include <QLineEdit>
+#include <QHostAddress>
 #include <QMap>
 #include <QtNetwork/qnetworkinterface.h>
 #include <QGuiApplication>
+#include <QCoreApplication>
 #include <QCursor>
 #include <QDesktopServices>
 #include <QDir>
@@ -20,6 +35,7 @@
 #include <QRegularExpression>
 #include <QPointer>
 #include <functional>
+#include <QUrl>
 
 #include <QtWebEngineCore/qtwebenginecoreglobal.h>
 
@@ -67,6 +83,7 @@ SystemComponent::SystemComponent(QObject* parent) : ComponentBase(parent), m_pla
   });
 
   m_networkManager = new QNetworkAccessManager(this);
+  connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &SystemComponent::stopSshTunnel);
 
 // define OS Type
 #if defined(Q_OS_MAC)
@@ -340,8 +357,21 @@ void SystemComponent::checkServerConnectivity(QString url)
 
   // Store for retry
   m_pendingConnectivityUrl = url;
+  const QString requestedUrl = url;
 
-  resolveUrl(url, [this, url](const QString& fullResolvedUrl) {
+  if (QUrl(url).scheme().compare("ssh", Qt::CaseInsensitive) == 0)
+  {
+    QString localUrl;
+    if (!ensureSshTunnel(url, localUrl))
+    {
+      m_pendingConnectivityUrl.clear();
+      emit serverConnectivityResult(requestedUrl, false, requestedUrl);
+      return;
+    }
+    url = localUrl;
+  }
+
+  resolveUrl(url, [this, url, requestedUrl](const QString& fullResolvedUrl) {
     QString baseUrl = extractBaseUrl(fullResolvedUrl);
 
     QString checkUrl = baseUrl + "/System/Info/Public";
@@ -362,7 +392,7 @@ void SystemComponent::checkServerConnectivity(QString url)
               reply, QOverload<>::of(&QNetworkReply::ignoreSslErrors));
     }
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, url, fullResolvedUrl]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestedUrl, fullResolvedUrl]() {
       if (reply->error() == QNetworkReply::OperationCanceledError) {
         reply->deleteLater();
         if (m_connectivityCheckReply == reply) {
@@ -387,7 +417,7 @@ void SystemComponent::checkServerConnectivity(QString url)
       if (success) {
         m_connectivityRetryTimer->stop();
         m_pendingConnectivityUrl.clear();
-        emit serverConnectivityResult(url, success, fullResolvedUrl);
+        emit serverConnectivityResult(requestedUrl, success, fullResolvedUrl);
       } else {
         m_connectivityRetryTimer->start(CONNECTIVITY_RETRY_INTERVAL_MS);
       }
@@ -400,11 +430,306 @@ void SystemComponent::checkServerConnectivity(QString url)
   });
 }
 
+bool SystemComponent::ensureSshTunnel(const QString& rawUrl, QString& localUrl)
+{
+  const QUrl address(rawUrl);
+  const QString username = address.userName();
+  const QString hostname = address.host();
+  const int port = address.port(22);
+  if (address.scheme().compare("ssh", Qt::CaseInsensitive) != 0 || username.isEmpty() || hostname.isEmpty() ||
+      !address.password().isEmpty() || !address.path().isEmpty() || !address.query().isEmpty() || !address.fragment().isEmpty() ||
+      port < 1 || port > 65535 || username.contains(QRegularExpression("[^A-Za-z0-9_.-]")))
+  {
+    qWarning() << "[Wallaby Popcorn SSH] Invalid SSH URL or username";
+    QMessageBox::warning(nullptr, tr("Invalid SSH server address"),
+                         tr("Use ssh://username@hostname[:port] with no password or path."));
+    return false;
+  }
+  qWarning() << "[Wallaby Popcorn SSH] Starting setup for" << username << "@" << hostname << "port" << port;
+
+  const QString sshDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/ssh-tunnel";
+  if (!QDir().mkpath(sshDir))
+  {
+    qWarning() << "[Wallaby Popcorn SSH] Could not create app key directory:" << sshDir;
+    QMessageBox::critical(nullptr, tr("SSH tunnel"), tr("Could not create the SSH key directory."));
+    return false;
+  }
+  QFile::setPermissions(sshDir, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+  const QByteArray identity = QCryptographicHash::hash(rawUrl.toUtf8(), QCryptographicHash::Sha256).toHex();
+  const QString keyBase = sshDir + "/identity-" + QString::fromLatin1(identity);
+  const QString privateKey = keyBase;
+  const QString publicKey = keyBase + ".pub";
+  const QString knownHosts = sshDir + "/known-hosts-" + QString::fromLatin1(identity);
+
+  if (m_sshTunnelProcess && m_sshTunnelProcess->state() == QProcess::Running && m_sshTunnelAddress == rawUrl)
+  {
+    localUrl = m_sshTunnelLocalUrl;
+    return true;
+  }
+  stopSshTunnel();
+
+  if (!QFileInfo::exists(privateKey) || !QFileInfo::exists(publicKey))
+  {
+    qWarning() << "[Wallaby Popcorn SSH] Generating app Ed25519 key";
+    QFile::remove(knownHosts + ".enrolled");
+    QProcess keygen;
+    keygen.start("ssh-keygen", {"-q", "-t", "ed25519", "-N", "", "-C", "jellyfin-desktop", "-f", privateKey});
+    if (!keygen.waitForStarted(5000) || !keygen.waitForFinished(15000) || keygen.exitStatus() != QProcess::NormalExit || keygen.exitCode() != 0)
+    {
+      QMessageBox::critical(nullptr, tr("SSH tunnel"), tr("Could not create an Ed25519 SSH key. Make sure OpenSSH client tools are installed (openssh-client package)."));
+      return false;
+    }
+    qWarning() << "[Wallaby Popcorn SSH] App key generated";
+    QFile::setPermissions(privateKey, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    QFile::setPermissions(publicKey, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  }
+
+  const QString hostKeyAlgorithm = "ssh-ed25519";
+  if (!QFileInfo::exists(knownHosts))
+  {
+    qWarning() << "[Wallaby Popcorn SSH] Scanning SSH host key";
+    QProcess scan;
+    scan.start("ssh-keyscan", {"-T", "8", "-p", QString::number(port), "-t", "ed25519", hostname});
+    if (!scan.waitForStarted(5000) || !scan.waitForFinished(12000))
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Host key scan failed:" << scan.errorString() << scan.readAllStandardError();
+      QMessageBox::critical(nullptr, tr("SSH host key unavailable"), tr("Could not retrieve an Ed25519 host key from %1:%2.").arg(hostname).arg(port));
+      return false;
+    }
+    const QByteArray scanOutput = scan.readAllStandardOutput();
+    if (scan.exitStatus() != QProcess::NormalExit || scan.exitCode() != 0 || scanOutput.isEmpty())
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Host key scan failed:" << scan.errorString() << scan.readAllStandardError();
+      QMessageBox::critical(nullptr, tr("SSH host key unavailable"), tr("Could not retrieve an Ed25519 host key from %1:%2.").arg(hostname).arg(port));
+      return false;
+    }
+    QByteArray keyLine;
+    for (const QByteArray& candidate : scanOutput.split('\n'))
+    {
+      const QByteArray line = candidate.simplified();
+      if (line.isEmpty() || line.startsWith('#')) continue;
+      const QList<QByteArray> fields = line.split(' ');
+      if (fields.size() >= 3 && fields.at(1) == "ssh-ed25519")
+      {
+        keyLine = line + '\n';
+        break;
+      }
+    }
+    if (keyLine.isEmpty())
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Host key scan returned no usable ssh-ed25519 key line";
+      QMessageBox::critical(nullptr, tr("SSH host key unavailable"), tr("The SSH scan did not return a usable Ed25519 host key."));
+      return false;
+    }
+    QTemporaryFile fingerprintFile;
+    if (!fingerprintFile.open())
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not create temporary host-key fingerprint file:" << fingerprintFile.errorString();
+      QMessageBox::critical(nullptr, tr("SSH host key error"), tr("Could not create a temporary file to verify the SSH host key."));
+      return false;
+    }
+    fingerprintFile.write(keyLine);
+    fingerprintFile.flush();
+    QProcess fingerprint;
+    fingerprint.start("ssh-keygen", {"-lf", fingerprintFile.fileName(), "-E", "sha256"});
+    if (!fingerprint.waitForStarted(5000) || !fingerprint.waitForFinished(5000) ||
+        fingerprint.exitStatus() != QProcess::NormalExit || fingerprint.exitCode() != 0)
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not calculate host-key fingerprint:" << fingerprint.errorString() << fingerprint.readAllStandardError();
+      QMessageBox::critical(nullptr, tr("SSH host key error"), tr("Could not calculate the fingerprint for the SSH host key."));
+      return false;
+    }
+    const QString fingerprintText = QString::fromLocal8Bit(fingerprint.readAllStandardOutput()).trimmed();
+    qWarning() << "[Wallaby Popcorn SSH] Host key scan completed; showing fingerprint confirmation";
+    if (fingerprintText.isEmpty() || QMessageBox::question(nullptr, tr("Verify SSH host key"),
+        tr("Check this fingerprint with the server administrator before trusting it:\n\n%1\n\nTrust this key for %2:%3?").arg(fingerprintText).arg(hostname).arg(port),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Host-key confirmation declined or fingerprint unavailable";
+      return false;
+    }
+    QFile pinFile(knownHosts);
+    if (!pinFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not save pinned host key:" << pinFile.errorString();
+      QMessageBox::critical(nullptr, tr("SSH host key error"), tr("Could not save the verified SSH host key."));
+      return false;
+    }
+    pinFile.write(keyLine);
+    pinFile.close();
+    QFile::setPermissions(knownHosts, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  }
+
+  if (!QFileInfo::exists(knownHosts + ".enrolled"))
+  {
+    qWarning() << "[Wallaby Popcorn SSH] App key needs enrollment; showing password prompt";
+    bool accepted = false;
+    const QString password = QInputDialog::getText(nullptr, tr("Enroll this Jellyfin client"),
+      tr("Enter the SSH account password for %1@%2. This installs a dedicated app key on the server.").arg(username, hostname),
+      QLineEdit::Password, QString(), &accepted);
+    if (!accepted)
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Password enrollment prompt cancelled";
+      return false;
+    }
+    if (password.isEmpty())
+    {
+      QMessageBox::warning(nullptr, tr("SSH enrollment"), tr("A password is required to enroll the app key."));
+      return false;
+    }
+
+    QTemporaryDir askpassDir;
+    if (!askpassDir.isValid())
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not create temporary askpass directory:" << askpassDir.errorString();
+      QMessageBox::critical(nullptr, tr("SSH enrollment error"), tr("Could not create temporary files for SSH key enrollment."));
+      return false;
+    }
+    const QString passwordFile = askpassDir.path() + "/password";
+    QFile secret(passwordFile);
+    if (!secret.open(QIODevice::WriteOnly))
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not write temporary password file:" << secret.errorString();
+      QMessageBox::critical(nullptr, tr("SSH enrollment error"), tr("Could not prepare the SSH password prompt."));
+      return false;
+    }
+    secret.write(password.toUtf8());
+    secret.close();
+    QFile::setPermissions(passwordFile, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    const QString askpassPath = askpassDir.path() + "/askpass";
+    QFile askpass(askpassPath);
+    if (!askpass.open(QIODevice::WriteOnly))
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not write askpass helper:" << askpass.errorString();
+      QMessageBox::critical(nullptr, tr("SSH enrollment error"), tr("Could not prepare the SSH password prompt."));
+      return false;
+    }
+    askpass.write("#!/bin/sh\ncat \"" + passwordFile.toUtf8() + "\"\n");
+    askpass.close();
+    QFile::setPermissions(askpassPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    QProcess ssh;
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("SSH_ASKPASS", askpassPath);
+    env.insert("SSH_ASKPASS_REQUIRE", "force");
+    if (!env.contains("DISPLAY")) env.insert("DISPLAY", ":0");
+    ssh.setProcessEnvironment(env);
+    QStringList enrollArgs = {"-F", "/dev/null", "-T", "-p", QString::number(port), "-o", "StrictHostKeyChecking=yes", "-o",
+      "UserKnownHostsFile=" + knownHosts, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HostKeyAlgorithms=" + hostKeyAlgorithm, "-o",
+      "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no", "-o", "NumberOfPasswordPrompts=1",
+      username + "@" + hostname, "/usr/local/libexec/jellyfin-ssh-enrol.py", "--trusted"};
+    ssh.start("ssh", enrollArgs);
+    if (!ssh.waitForStarted(5000))
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not start SSH enrollment process:" << ssh.errorString();
+      QMessageBox::critical(nullptr, tr("SSH enrollment error"), tr("Could not start the SSH client for key enrollment."));
+      return false;
+    }
+    QFile pub(publicKey);
+    if (!pub.open(QIODevice::ReadOnly))
+    {
+      qWarning() << "[Wallaby Popcorn SSH] Could not read app public key:" << pub.errorString();
+      QMessageBox::critical(nullptr, tr("SSH enrollment error"), tr("Could not read the app's SSH public key."));
+      return false;
+    }
+    const QByteArray enrollment = "JFIN-SSH-ENROLL/1 " + pub.readAll().trimmed() + "\n";
+    ssh.write(enrollment);
+    ssh.closeWriteChannel();
+    if (!ssh.waitForFinished(30000))
+    {
+      ssh.kill();
+      ssh.waitForFinished(2000);
+    }
+    const QByteArray result = ssh.readAllStandardOutput() + ssh.readAllStandardError();
+    qWarning() << "[Wallaby Popcorn SSH] Enrollment process finished with code" << ssh.exitCode() << "output:" << result;
+    if (!result.contains("JFIN-SSH-ENROLL/1 OK INSTALLED") && !result.contains("JFIN-SSH-ENROLL/1 OK ALREADY_PRESENT"))
+    {
+      QMessageBox::critical(nullptr, tr("SSH enrollment failed"), tr("The server did not accept this app's SSH key. Check that the Jellyfin SSH enrollment helper is installed and try again."));
+      return false;
+    }
+    QFile enrolledMarker(knownHosts + ".enrolled");
+    if (enrolledMarker.open(QIODevice::WriteOnly)) enrolledMarker.close();
+  }
+
+  bool portSeedOk = false;
+  const uint portSeed = identity.left(8).toUInt(&portSeedOk, 16);
+  if (!portSeedOk)
+  {
+    qWarning() << "[Wallaby Popcorn SSH] Could not derive the stable local tunnel port";
+    QMessageBox::critical(nullptr, tr("SSH tunnel error"), tr("Could not select a stable local port for the Jellyfin tunnel."));
+    return false;
+  }
+  const quint16 localPort = static_cast<quint16>(20000 + (portSeed % 10000));
+  QTcpServer portProbe;
+  if (!portProbe.listen(QHostAddress::LocalHost, localPort))
+  {
+    qWarning() << "[Wallaby Popcorn SSH] Stable local port" << localPort << "is unavailable:" << portProbe.errorString();
+    QMessageBox::critical(nullptr, tr("SSH tunnel error"),
+                          tr("The stable local port for this SSH server is already in use. Close the program using it and try again."));
+    return false;
+  }
+  portProbe.close();
+  m_sshTunnelProcess = new QProcess(this);
+  QStringList tunnelArgs = {"-F", "/dev/null", "-N", "-L", QString("127.0.0.1:%1:127.0.0.1:8096").arg(localPort), "-p", QString::number(port),
+    "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-o",
+    "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=" + knownHosts, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HostKeyAlgorithms=" + hostKeyAlgorithm,
+    "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", privateKey, username + "@" + hostname};
+  m_sshTunnelProcess->start("ssh", tunnelArgs);
+  qWarning() << "[Wallaby Popcorn SSH] Starting port-forward process";
+  if (!m_sshTunnelProcess->waitForStarted(5000))
+  {
+    stopSshTunnel();
+    QMessageBox::critical(nullptr, tr("SSH tunnel failed"), tr("Could not start OpenSSH on this computer."));
+    return false;
+  }
+  QElapsedTimer wait;
+  wait.start();
+  bool listening = false;
+  while (wait.elapsed() < 5000 && m_sshTunnelProcess->state() == QProcess::Running)
+  {
+    QTcpSocket probe;
+    probe.connectToHost(QHostAddress::LocalHost, localPort);
+    if (probe.waitForConnected(150)) { listening = true; probe.disconnectFromHost(); break; }
+    QThread::msleep(50);
+  }
+  if (!listening)
+  {
+    const QString error = QString::fromLocal8Bit(m_sshTunnelProcess->readAllStandardError()).trimmed();
+    qWarning() << "[Wallaby Popcorn SSH] Tunnel did not listen within 5 seconds:" << error;
+    stopSshTunnel();
+    QMessageBox::critical(nullptr, tr("SSH tunnel failed"), error.isEmpty() ? tr("The Jellyfin tunnel did not become ready.") : error);
+    return false;
+  }
+  m_sshTunnelAddress = rawUrl;
+  m_sshTunnelLocalUrl = QString("http://127.0.0.1:%1").arg(localPort);
+  localUrl = m_sshTunnelLocalUrl;
+  qWarning() << "[Wallaby Popcorn SSH] Tunnel is ready on" << m_sshTunnelLocalUrl;
+  return true;
+}
+
+void SystemComponent::stopSshTunnel()
+{
+  if (!m_sshTunnelProcess) return;
+  if (m_sshTunnelProcess->state() != QProcess::NotRunning)
+  {
+    m_sshTunnelProcess->terminate();
+    if (!m_sshTunnelProcess->waitForFinished(1500)) { m_sshTunnelProcess->kill(); m_sshTunnelProcess->waitForFinished(1000); }
+  }
+  m_sshTunnelProcess->deleteLater();
+  m_sshTunnelProcess = nullptr;
+  m_sshTunnelAddress.clear();
+  m_sshTunnelLocalUrl.clear();
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void SystemComponent::cancelServerConnectivity()
 {
   if (m_connectivityRetryTimer->isActive()) {
     m_connectivityRetryTimer->stop();
+  }
+
+  if (m_pendingConnectivityUrl.startsWith("ssh://", Qt::CaseInsensitive))
+  {
+    stopSshTunnel();
   }
 
   // Save pointers before abort() since it synchronously triggers finished handlers
@@ -491,6 +816,18 @@ QStringList SystemComponent::networkAddresses() const
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+bool SystemComponent::isManagementUrl(const QString& current, const QString& candidate) const
+{
+  const QUrl base(current);
+  const QUrl target = base.resolved(QUrl(candidate));
+  const bool webScheme = target.scheme() == "http" || target.scheme() == "https";
+  const auto effectivePort = [](const QUrl& url) { return url.port(url.scheme() == "https" ? 443 : 80); };
+  if (!webScheme || base.scheme() != target.scheme() || base.host() != target.host() ||
+      effectivePort(base) != effectivePort(target) || !target.userInfo().isEmpty()) return false;
+  return QRegularExpression("^!?/(dashboard|metadata)([/ ?]|$)").match(target.fragment()).hasMatch() ||
+         QRegularExpression("/(dashboard|metadata)(/|$)").match(target.path()).hasMatch();
+}
+
 void SystemComponent::openExternalUrl(const QString& url)
 {
   QDesktopServices::openUrl(QUrl(url));
@@ -568,6 +905,24 @@ QString SystemComponent::getNativeShellScript()
   }
   clientData.insert("mode", QJsonValue::fromVariant(defaultMode));
 
+  auto assetData = [](const QString& path, const QByteArray& mime) -> QString {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return QString();
+    return "data:" + QString::fromLatin1(mime) + ";base64," + QString::fromLatin1(file.readAll().toBase64());
+  };
+  QJsonObject branding;
+  branding.insert("mark", assetData(":/web-client/extension/branding/wallaby-popcorn-mark.png", "image/png"));
+  branding.insert("lightWordmark", assetData(":/web-client/extension/branding/wallaby-popcorn-wordmark-light.svg", "image/svg+xml"));
+  branding.insert("darkWordmark", assetData(":/web-client/extension/branding/wallaby-popcorn-wordmark-dark.svg", "image/svg+xml"));
+  QFile cssFile(":/web-client/extension/wallaby-popcorn.css");
+  if (cssFile.open(QIODevice::ReadOnly)) {
+    QString css = QString::fromUtf8(cssFile.readAll());
+    css.replace("/native/wallaby-popcorn-mark.png", branding.value("mark").toString());
+    css.replace("/native/wallaby-popcorn-wordmark-light.svg", branding.value("lightWordmark").toString());
+    branding.insert("css", css);
+  }
+  clientData.insert("branding", branding);
+
   QVariantList settingsDescriptionsList = SettingsComponent::Get().settingDescriptions();
   QVariantMap settingsDescriptions = QVariantMap();
   for (auto setting : settingsDescriptionsList) {
@@ -598,7 +953,11 @@ QString SystemComponent::getNativeShellScript()
     ":/web-client/extension/inputPlugin.js",
     ":/web-client/extension/updatePlugin.js",
     ":/web-client/extension/connectivityHelper.js",
-    ":/web-client/extension/nativeshell.js"
+    ":/web-client/extension/nativeshell.js",
+    ":/web-client/extension/wallaby-branding.js",
+    ":/web-client/extension/wallaby-desktop.js",
+    ":/web-client/extension/wallaby-library-paging.js",
+    ":/web-client/extension/wallaby-library.js"
   };
 
   cachedScript = jmpInfoDeclaration;

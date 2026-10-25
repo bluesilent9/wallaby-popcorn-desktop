@@ -1,7 +1,10 @@
-#! /usr/bin/make -f
+#!/usr/bin/make -f
 
 %:
-	dh $@
+	dh $@ --buildsystem=cmake
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DCHECK_FOR_UPDATES=ON
+	dh_auto_configure -- -DCHECK_FOR_UPDATES=OFF -DBUILD_TESTING=OFF -DUSE_STATIC_MPVQT=ON -DCMAKE_INSTALL_BINDIR=lib/wallaby-popcorn -DCMAKE_INSTALL_RPATH=
+
+override_dh_auto_build:
+	dh_auto_build -- -j1

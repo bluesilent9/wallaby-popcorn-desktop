@@ -1,6 +1,6 @@
 async function tryConnect(server) {
     try {
-        if (!server.startsWith("http")) {
+        if (!/^https?:\/\//i.test(server) && !/^ssh:\/\//i.test(server)) {
             server = "http://" + server;
         }
 

@@ -78,8 +78,10 @@ endif(Qt6_POSITION_INDEPENDENT_CODE)
 add_subdirectory(external)
 add_subdirectory(src)
 
-enable_testing()
-add_subdirectory(tests)
+include(CTest)
+if(BUILD_TESTING)
+  add_subdirectory(tests)
+endif()
 
 include(CPackConfiguration)
 

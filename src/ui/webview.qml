@@ -8,12 +8,12 @@ import QtQuick.Controls 6.0
 Window
 {
   id: mainWindow
-  title: "Jellyfin"
+  title: "Wallaby Popcorn"
   objectName: "mainWindow"
   width: 1280
   height: 720
-  minimumWidth: 213
-  minimumHeight: 120
+  minimumWidth: 800
+  minimumHeight: 600
   visible: true
   color: "#000000"
 
@@ -289,8 +289,13 @@ Window
     {
       if (request.userInitiated)
       {
-        console.log("Opening external URL: " + web.currentHoveredUrl)
-        components.system.openExternalUrl(web.currentHoveredUrl)
+        const destination = request.requestedUrl.toString()
+        if (components.system.isManagementUrl(web.url.toString(), destination)) {
+          // Server administration stays on this authenticated origin and SSH tunnel.
+          request.openIn(web)
+        } else {
+          components.system.openExternalUrl(destination)
+        }
       }
     }
 

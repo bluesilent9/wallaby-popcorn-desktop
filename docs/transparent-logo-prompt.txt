@@ -1,0 +1,8 @@
+Mode: built-in image_gen editing; transparent_background=true.
+Reference: branding/wallaby-popcorn.png.
+
+Use case: background-extraction. Asset type: transparent in-app branding mascot for Wallaby Popcorn, matching the attached approved launcher artwork. Edit the attached image: keep the exact same friendly golden-brown wallaby character, recognizable face, eyes, long ears, happy expression, red-and-cream striped popcorn bucket, general pose, warm gold and subtle teal highlights, and polished 3D illustration style. Remove the cinema background, floor, floor reflections and loose popcorn on the floor entirely. Produce a clean isolated mascot cutout on a genuinely transparent alpha background, no square backdrop, no badge, no cast ground shadow, no text, no watermark. Keep both ears, tail, feet and bucket inside the canvas with about 8% transparent margin, centered. Slightly simplify tiny fur and popcorn details only as needed for readability at small UI sizes; do not redesign the mascot or change its identity. Crisp clean silhouette with no dark rectangular background or bright halo, usable over plum, black, grey and light UI backgrounds.
+
+Final artwork: app/src/main/assets/native/wallaby-popcorn-mark.png.
+Wordmarks: the same PNG embedded in two SVG compositions with light/dark text.
+Launcher artwork unchanged. Development source only; not built or runtime-tested.

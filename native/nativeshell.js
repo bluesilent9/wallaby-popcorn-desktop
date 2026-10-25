@@ -45,7 +45,11 @@ for (const plugin of plugins) {
 
 window.NativeShell = {
     openUrl(url, target) {
-        window.api.system.openExternalUrl(url);
+        if (window.wallabyDesktop && window.wallabyDesktop.isManagementUrl(location.href, url)) {
+            location.assign(new URL(url, location.href).href);
+        } else {
+            window.api.system.openExternalUrl(url);
+        }
     },
 
     downloadFile(downloadInfo) {
@@ -316,7 +320,7 @@ window.NativeShell.AppHost = {
     init() {
         return Promise.resolve({
             deviceName: jmpInfo.deviceName,
-            appName: "Jellyfin Desktop",
+            appName: "Wallaby Popcorn",
             appVersion: jmpInfo.version
         });
     },
@@ -329,7 +333,7 @@ window.NativeShell.AppHost = {
     getDeviceProfile,
     getSyncProfile: getDeviceProfile,
     appName() {
-        return "Jellyfin Desktop";
+        return "Wallaby Popcorn";
     },
     appVersion() {
         return jmpInfo.version;
