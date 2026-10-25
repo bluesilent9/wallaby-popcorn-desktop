@@ -66,6 +66,14 @@ Window
     onTriggered: mainWindow.toggleFullscreen()
   }
 
+  // Desktop mode bypasses the native input map, so bind backslash here too.
+  Action
+  {
+    enabled: mainWindow.webDesktopMode
+    shortcut: "\\"
+    onTriggered: mainWindow.toggleFullscreen()
+  }
+
   Action
   {
     shortcut: "Alt+Return"
