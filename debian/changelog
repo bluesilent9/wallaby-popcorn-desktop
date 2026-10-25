@@ -1,3 +1,13 @@
+wallaby-popcorn (2.0.0-0wallaby4) UNRELEASED; urgency=medium
+
+  * Keep library titles and details fixed while the title viewport scrolls.
+  * Add consistent keyboard/hover focus, remembered detail-page return, Home
+    Escape-to-exit and desktop backslash fullscreen toggling.
+  * Hide main navigation outside Home while retaining library filter controls.
+  * Simplify video badges and add Home fanart with library-tile fallback artwork.
+
+ -- Wallaby Suite <bluesilent9@users.noreply.github.com>  Mon, 26 Oct 2026 17:00:00 +1100
+
 wallaby-popcorn (2.0.0-0wallaby3) UNRELEASED; urgency=medium
 
   * Retain loaded fanart during selection and crossfade after one second.
