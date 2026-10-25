@@ -11,7 +11,7 @@ source /etc/os-release
 jobs=${WALLABY_BUILD_JOBS:-1}
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || { echo 'WALLABY_BUILD_JOBS must be a positive integer.' >&2; exit 1; }
 version=$(tr -d '\n\r ' < "$repo/VERSION")
-package_version="${version}-0wallaby5~ubuntu${VERSION_ID}"
+package_version="${version}-0wallaby6~ubuntu${VERSION_ID}"
 resolver_package=systemd-resolved
 [[ $VERSION_ID != 22.04 ]] || resolver_package=systemd
 build="$repo/build-ubuntu-${VERSION_ID}-amd64"
