@@ -150,3 +150,29 @@ body.wallaby-media-surface .skinBody, body.wallaby-home .homePage { background:t
 .wallaby-virtual-native-list > .wallaby-virtual-card { margin-bottom:12px !important; }
 
 .wallaby-cinema-wallpaper.wallaby-fanart-ready { background-image:none; }
+
+/* Browsing is a fixed desktop workspace. Only its title viewport scrolls. */
+body.wallaby-library-active { overflow:hidden !important; }
+.wallaby-library-shell { overflow:hidden !important; }
+body.wallaby-media-surface:not(.wallaby-home) .skinHeader { display:none !important; }
+/* Modern web keeps the library/filter toolbar in the same AppBar as navigation. */
+body.wallaby-media-surface:not(.wallaby-home) .MuiAppBar-root > .MuiToolbar-root:first-child { display:none !important; }
+.wallaby-library-viewport {
+ position:fixed !important; top:var(--wallaby-library-top, 8rem) !important;
+ left:var(--wallaby-list-left, 3vw) !important; width:var(--wallaby-list-width, 94vw) !important;
+ bottom:1.5rem !important; height:auto !important; max-height:none !important;
+ overflow-y:auto !important; overflow-x:hidden !important; overscroll-behavior:contain;
+ margin:0 !important; padding-bottom:0 !important; scroll-behavior:auto; scrollbar-gutter:stable;
+ transform:none !important; z-index:2;
+}
+body.wallaby-library-active .wallaby-cinema-detail {
+ top:var(--wallaby-library-top, 8rem) !important; bottom:1.5rem !important;
+ max-height:none !important; height:auto !important; overscroll-behavior:contain;
+}
+.wallaby-cinema-row:focus, .wallaby-virtual-card:focus { outline:2px solid var(--wallaby-teal); outline-offset:-2px; }
+.wallaby-cinema-open:focus, .wallaby-cinema-toggle:focus { outline:2px solid var(--wallaby-teal); outline-offset:2px; }
+.wallaby-home-wallpaper { position:fixed; inset:0; z-index:-1; pointer-events:none; background:transparent; }
+.wallaby-home-wallpaper img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 700ms ease; }
+.wallaby-home-wallpaper img.wallaby-art-visible { opacity:1; }
+.wallaby-home-wallpaper::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,rgba(15,8,25,.78),rgba(15,8,25,.5)),linear-gradient(0deg,rgba(15,8,25,.8),rgba(15,8,25,.25)); }
+@media(prefers-reduced-motion:reduce) { .wallaby-home-wallpaper img { transition:none; } }

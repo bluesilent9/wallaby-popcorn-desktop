@@ -65,7 +65,7 @@
     if (typeof window === 'undefined') return;
 
     window.wallabyLibraryRoute = libraryRoute;
-    let container, panel, toggle, selected, backdrop, backdropPage, selectedId = '', lastQuery = '', fadeCleanup, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
+    let container, panel, toggle, selected, backdrop, backdropPage, selectedId = '', lastQuery = '', selectedIndex = 0, fadeCleanup, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
     const visible = node => node && node.getClientRects().length && !node.closest('.hide, [hidden], [aria-hidden="true"]');
     const cards = () => container ? [...container.querySelectorAll('.card[data-id], .listItem[data-id], .wallaby-cinema-row[data-id]')] : [];
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
@@ -81,22 +81,32 @@
         window.wallabyLibraryPaging?.reset();
         container?.classList.remove('wallaby-cinema-items');
         container?.removeEventListener('click', intercept, true);
-        container?.removeEventListener('keydown', keyboard, true);
+        container?.removeEventListener('focusin', focusTitle);
+        container?.removeEventListener('pointerover', hover);
+        container?.classList.remove('wallaby-library-viewport');
+        document.querySelectorAll('.wallaby-library-shell').forEach(node => node.classList.remove('wallaby-library-shell'));
+        window.wallabyLibrary = null;
         container?.querySelectorAll('.wallaby-cinema-selected').forEach(card => card.classList.remove('wallaby-cinema-selected'));
         container?.querySelectorAll('.wallaby-cinema-caption').forEach(node => node.remove());
         panel?.remove(); toggle?.remove(); container = panel = toggle = selected = null; selectedId = ''; lastQuery = '';
         document.body?.classList.remove('wallaby-library-active');
     }
     function position() {
-        if (!panel || !container) return;
-        const header = document.querySelector('.skinHeader');
-        const top = Math.max((header?.getBoundingClientRect().bottom || 64) + 16, container.getBoundingClientRect().top);
-        panel.style.top = `${Math.min(top, window.innerHeight * .4)}px`;
+        if (!container) return;
+        const toolbar = [...document.querySelectorAll('.MuiToolbar-root.padded-left.padded-right, .libraryPage .pageTabContent .sectionTitleContainer, .toolbar')].filter(visible);
+        const top = Math.min(innerHeight * .35, Math.max(90, toggle?.getBoundingClientRect().bottom || 0, ...toolbar.map(node => node.getBoundingClientRect().bottom)) + 12);
+        document.body.style.setProperty('--wallaby-library-top', `${top}px`);
         const bounds = container.parentElement.getBoundingClientRect();
-        panel.style.right = `${Math.max(24, window.innerWidth - bounds.right)}px`;
-        panel.style.width = `${Math.max(300, bounds.width * .53)}px`;
+        const left = Math.max(24, bounds.left), width = Math.max(300, Math.min(innerWidth - left - 24, bounds.width || innerWidth - left * 2));
+        container.style.setProperty('--wallaby-list-left', `${left}px`);
+        container.style.setProperty('--wallaby-list-width', `${enabled ? width * .43 : width}px`);
+        if (panel) {
+            panel.style.top = `${top}px`; panel.style.right = `${Math.max(24, innerWidth - bounds.right)}px`;
+            panel.style.width = `${Math.max(280, width * .53)}px`;
+        }
     }
     function openItem(card) {
+        window.wallabyNavigation?.remember();
         const link = card.querySelector('a[href*="details"], a.itemAction[href], a[href]');
         if (link) { opening = true; try { link.click(); } finally { opening = false; } return; }
         // Uses Jellyfin's existing detail page if a non-anchor card renderer is selected.
@@ -160,7 +170,7 @@
         section.setAttribute('aria-label', 'Media file details');
         if (info.hasFile) {
             const badges = element('div', 'wallaby-media-badges');
-            for (const [kind, label, extra] of [['screen', info.video, info.dimensions],
+            for (const [kind, label, extra] of [['screen', info.video, ''],
                 [info.dolby ? 'dolby' : 'speaker', info.audio, info.audioQuality]]) {
                 if (!label) continue;
                 const badge = element('div', 'wallaby-media-badge'); badge.title = extra || label;
@@ -191,6 +201,7 @@
         if (!card || !enabled || selected === card) return;
         if (selectedId === card.dataset.id && panel?.children.length) { selected = card; card.classList.add('wallaby-cinema-selected'); return; }
         selected?.classList.remove('wallaby-cinema-selected'); selected = card; selectedId = card.dataset.id;
+        selectedIndex = Number(card.dataset.wallabyIndex || 0);
         const selectedAt = Date.now(); artwork.cancel();
         card.classList.add('wallaby-cinema-selected');
         const ticket = ++generation;
@@ -234,12 +245,50 @@
         if (event.target.closest('button, input, [data-action]:not([data-action="link"]), .cardOverlayButton')) return;
         event.preventDefault(); event.stopImmediatePropagation(); select(card);
     }
-    function keyboard(event) {
-        if (enabled && event.key === 'Enter' && selected && !event.target.closest('button, input, textarea, select')) { event.preventDefault(); event.stopImmediatePropagation(); openItem(selected); return; }
-        if (!enabled || !['ArrowUp', 'ArrowDown'].includes(event.key) || event.target.closest('input, textarea, select, button')) return;
-        const rows = cards().filter(visible); const index = rows.indexOf(selected);
-        const next = rows[Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))];
-        if (next) { event.preventDefault(); event.stopImmediatePropagation(); (next.querySelector('a[href], [tabindex]') || next).focus({ preventScroll: true }); select(next); next.scrollIntoView({ block: 'nearest' }); }
+    const rowSelector = '.wallaby-cinema-row[data-id], .wallaby-virtual-card[data-id]';
+    function focusTitle(event) {
+        const row = event.target.closest(rowSelector);
+        if (!row || !container.contains(row)) return;
+        selectedIndex = Number(row.dataset.wallabyIndex || 0);
+        if (enabled) select(row);
+        else { selectedId = row.dataset.id; selected = row; }
+    }
+    function hover(event) {
+        if (event.pointerType === 'touch') return;
+        const control = event.target.closest('button, a, input, select, [tabindex]');
+        const row = event.target.closest(rowSelector);
+        const target = control || row;
+        if (target && visible(target) && document.activeElement !== target) target.focus({ preventScroll: true });
+        if (row && enabled) select(row);
+    }
+    function arrow(key) {
+        if (!container?.isConnected) return false;
+        const active = document.activeElement;
+        const row = active?.closest(rowSelector);
+        if (!active || active === document.body || active === document.documentElement || !visible(active)) {
+            window.wallabyLibraryPaging?.focusIndex(selectedIndex); return true;
+        }
+        if (row && (key === 'ArrowUp' || key === 'ArrowDown')) {
+            window.wallabyLibraryPaging?.focusIndex(Number(row.dataset.wallabyIndex) + (key === 'ArrowDown' ? 1 : -1)); return true;
+        }
+        const controls = [...document.querySelectorAll('button, a[href], input:not([type="hidden"]), select, textarea, [tabindex="0"]')].filter(node =>
+            visible(node) && !node.disabled && !node.closest('.wallaby-virtual-library, .skinHeader, [role="dialog"], .mainDrawer') &&
+            !node.classList.contains('wallaby-cinema-paging-hidden') && !node.closest('.MuiAppBar-root > .MuiToolbar-root:first-child'));
+        const remembered = cards().find(node => Number(node.dataset.wallabyIndex) === selectedIndex && visible(node)) || cards().find(visible);
+        const zones = [...controls]; if (remembered) zones.push(remembered);
+        const horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
+        const forward = key === 'ArrowRight' || key === 'ArrowDown';
+        const origin = (row || active).getBoundingClientRect();
+        const center = r => [r.left + r.width / 2, r.top + r.height / 2]; const point = center(origin);
+        const candidates = zones.filter(node => node !== active && node !== row).map(node => {
+            const p = center(node.getBoundingClientRect()), dx = p[0] - point[0], dy = p[1] - point[1];
+            const primary = horizontal ? dx : dy, secondary = horizontal ? dy : dx;
+            return { node, primary: primary * (forward ? 1 : -1), score: Math.abs(primary) + Math.abs(secondary) * 2 };
+        }).filter(entry => entry.primary > 1).sort((a,b) => a.score - b.score);
+        const target = candidates[0]?.node || (row ? controls[forward ? 0 : controls.length - 1] : remembered);
+        if (target === remembered) window.wallabyLibraryPaging?.focusIndex(selectedIndex);
+        else target?.focus({ preventScroll: true });
+        return true; // Never let browsing arrows scroll the page itself.
     }
     function render() {
         if (container.classList.contains('wallaby-cinema-items') !== enabled) container.classList.toggle('wallaby-cinema-items', enabled);
@@ -248,10 +297,10 @@
         if (!document.body?.classList.contains('wallaby-library-active')) document.body?.classList.add('wallaby-library-active');
         if (!enabled) { if (backdrop || panel) { clearBackdrop(); generation++; } panel?.remove(); panel = selected = null; selectedId = '';
             window.wallabyLibraryPaging?.attach(container, select, openItem, { mode: 'native' });
-            container.querySelectorAll('.wallaby-cinema-caption').forEach(node => node.remove()); return; }
+            container.querySelectorAll('.wallaby-cinema-caption').forEach(node => node.remove()); position(); restore(); return; }
         if (!panel) {
             panel = element('aside', 'wallaby-cinema-detail'); panel.setAttribute('aria-label', 'Selected title details');
-            panel.setAttribute('aria-live', 'polite'); container.after(panel);
+            panel.setAttribute('aria-live', 'polite'); panel.addEventListener('pointerover', hover); container.after(panel);
         }
         window.wallabyLibraryPaging?.attach(container, select, openItem, { mode: 'cinema' });
         const query = window.wallabyLibraryPaging?.queryKey();
@@ -259,12 +308,19 @@
         if (query) lastQuery = query;
         const current = cards().find(card => card.dataset.id === selectedId && visible(card));
         if (current) { selected = current; current.classList.add('wallaby-cinema-selected'); }
-        if (!selectedId) { selected = null; select(cards().find(visible)); }
+        if (!selectedId && !window.wallabyNavigation?.pending(location.hash)) { selected = null; select(cards().find(visible)); }
         if (!cards().length && !selectedId) {
             const status = window.wallabyLibraryPaging?.status();
             setText(panel, status?.total === 0 ? 'No titles in this view. Try changing Jellyfin’s filters.' : 'Loading titles…');
         }
-        position();
+        position(); restore();
+    }
+    function restore() {
+        const state = window.wallabyNavigation?.pending(location.hash);
+        if (!state || !window.wallabyLibraryPaging?.queryKey()) return;
+        selectedIndex = state.index; selectedId = ''; selected = null; container.scrollTop = state.scrollTop;
+        window.wallabyNavigation.restored();
+        window.wallabyLibraryPaging.focusIndex(selectedIndex);
     }
     function sync() {
         const client = window.ApiClient;
@@ -283,7 +339,12 @@
             toggle = element('button', 'wallaby-cinema-toggle'); toggle.type = 'button';
             toggle.addEventListener('click', () => { enabled = !enabled; remember(enabled); render(); });
             container.before(toggle);
-            container.addEventListener('click', intercept, true); container.addEventListener('keydown', keyboard, true);
+            toggle.addEventListener('pointerover', hover);
+            container.classList.add('wallaby-library-viewport');
+            for (let node = container.parentElement; node && node !== document.body; node = node.parentElement) node.classList.add('wallaby-library-shell');
+            container.addEventListener('click', intercept, true); container.addEventListener('focusin', focusTitle);
+            container.addEventListener('pointerover', hover);
+            window.wallabyLibrary = { arrow, snapshot: () => ({ hash: location.hash, id: selectedId, index: selectedIndex, scrollTop: container.scrollTop }) };
         }
         render();
     }
@@ -296,7 +357,10 @@
         new MutationObserver(records => schedule(records)).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         window.addEventListener('hashchange', () => { cleanup(); schedule(); });
         window.addEventListener('wallaby-library-query', () => schedule());
-        window.addEventListener('resize', position); window.addEventListener('scroll', position, true);
+        window.addEventListener('resize', position);
+        document.addEventListener('pointerover', event => {
+            if (container?.isConnected && libraryRoute(location.hash) && !event.target.closest('[role="dialog"], [role="menu"]')) hover(event);
+        });
         window.addEventListener('focus', () => schedule()); setInterval(() => schedule(), 5000); schedule();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();

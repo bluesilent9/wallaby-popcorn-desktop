@@ -248,6 +248,7 @@
         }
         card.querySelectorAll('.cardDefaultText').forEach(node => node.textContent = title);
         card.style.setProperty('width', '100%', 'important'); card.style.height = `${state.rowHeight - 12}px`; card.style.overflow = 'hidden';
+        card.tabIndex = 0;
         card.removeAttribute('title'); card.setAttribute('aria-label', title); card.dataset.wallabyIndex = index;
         return card;
     }
@@ -268,9 +269,12 @@
         if (!active || !host?.isConnected) return;
         const state = active, columns = state.columns, height = state.rowHeight;
         const totalRows = Math.ceil(state.total / columns);
-        const offset = Math.max(0, -host.getBoundingClientRect().top + 100);
+        const viewport = host.parentElement;
+        const inset = viewport.classList.contains('wallaby-library-viewport') ? viewport.getBoundingClientRect().top : 100;
+        const offset = Math.max(0, -host.getBoundingClientRect().top + inset);
         const startRow = Math.min(Math.max(0, totalRows - 1), Math.max(0, Math.floor(offset / height) - 3));
-        const endRow = Math.min(totalRows, startRow + Math.ceil(innerHeight / height) + 7);
+        const viewHeight = viewport.classList.contains('wallaby-library-viewport') ? viewport.clientHeight || innerHeight : innerHeight;
+        const endRow = Math.min(totalRows, startRow + Math.ceil(viewHeight / height) + 7);
         const start = startRow * columns, end = Math.min(state.total, endRow * columns);
         if (start === state.start && end === state.end && !state.dirty) return;
         state.start = start; state.end = end; state.dirty = false;
@@ -300,7 +304,9 @@
             content.append(row);
         }
         fragment.append(content, spacer(Math.max(0, totalRows - endRow) * height)); host.replaceChildren(fragment);
-        if (focusIndex != null) host.querySelector(`[data-wallaby-index="${focusIndex}"]`)?.focus({ preventScroll: true });
+        const wanted = state.pendingFocus ?? focusIndex;
+        const target = wanted != null && host.querySelector(`[data-wallaby-index="${wanted}"][data-id]`);
+        if (target) { state.pendingFocus = null; target.focus({ preventScroll: true }); }
         if (missing !== null && !state.loading && !state.failed) load(missing, state);
     }
     async function load(start, state) {
@@ -316,8 +322,16 @@
         } catch (_) { if (ticket === epoch) state.failed = true; }
         finally { if (ticket === epoch) { state.loading = false; state.dirty = true; paint(); window.dispatchEvent(new Event('wallaby-library-query')); } }
     }
+    function focusIndex(index) {
+        if (!active || !host?.isConnected || !active.total) return false;
+        index = Math.max(0, Math.min(active.total - 1, index));
+        const viewport = host.parentElement;
+        const rowTop = Math.floor(index / active.columns) * active.rowHeight;
+        if (rowTop < viewport.scrollTop || rowTop + active.rowHeight > viewport.scrollTop + viewport.clientHeight) viewport.scrollTop = rowTop;
+        active.pendingFocus = index; active.dirty = true; paint(); return true;
+    }
     function schedule() { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; paint(); }); } }
-    window.wallabyLibraryPaging = { install, attach, reset, clear, item, status: () => active ? { total: active.total, loading: active.loading } : { total: null, loading: true }, queryKey: () => active ? JSON.stringify(continuationQuery(active.capture.query, 0)) : '' };
+    window.wallabyLibraryPaging = { install, attach, reset, clear, item, focusIndex, status: () => active ? { total: active.total, loading: active.loading } : { total: null, loading: true }, queryKey: () => active ? JSON.stringify(continuationQuery(active.capture.query, 0)) : '' };
     window.addEventListener('scroll', schedule, true); window.addEventListener('resize', schedule); window.addEventListener('hashchange', clear);
     setInterval(() => install(window.ApiClient), 250); install(window.ApiClient);
 })();
