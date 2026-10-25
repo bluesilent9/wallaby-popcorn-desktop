@@ -1,3 +1,14 @@
+wallaby-popcorn (2.0.0-0wallaby5) UNRELEASED; urgency=medium
+
+  * Preserve virtual-library cache and scroll through repeated SDK responses and
+    native list repaints instead of flashing loaded titles back to placeholders.
+  * Group the library dropdown and layout switch in the right-aligned toolbar.
+  * Open details when a title is clicked; preserve hover and keyboard selection.
+  * Add a fading Home content boundary, simplify header links and show username.
+  * Delay return to Wallaby artwork for one second, matching movie hover delay.
+
+ -- Wallaby Suite <bluesilent9@users.noreply.github.com>  Mon, 26 Oct 2026 18:00:00 +1100
+
 wallaby-popcorn (2.0.0-0wallaby4) UNRELEASED; urgency=medium
 
   * Keep library titles and details fixed while the title viewport scrolls.
