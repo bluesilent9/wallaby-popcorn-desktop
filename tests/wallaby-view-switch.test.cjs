@@ -16,11 +16,50 @@ test('controller survives repeated view changes without repaint loops or stale o
  const result=await w.ApiClient.getItems('user',{ParentId:'movies',IncludeItemTypes:'Movie',Limit:100});
  list.innerHTML=result.Items.map(item=>`<div class="card" data-id="${item.Id}"><a href="#/details?id=${item.Id}"><div class="cardText">${item.Name}</div><div class="cardText">2000</div></a></div>`).join('');
  const tick=()=>new Promise(r=>setTimeout(r,100));await tick();
- for(let i=0;i<6;i++){const button=w.document.querySelector('.wallaby-cinema-toggle');assert.ok(button);button.click();await tick();assert.equal(list.querySelectorAll('.wallaby-virtual-library').length,1);}
+ let nativeClicks=0,gearClicks=0;
+ const openMenu=async()=>{
+  w.document.getElementById('selectview-popover')?.remove();
+  const popup=w.document.createElement('div');popup.id='selectview-popover';
+  popup.innerHTML='<ul role="menu"><li role="menuitem" tabindex="-1" class="MuiMenuItem-root" id="grid"><span class="MuiListItemIcon-root">✓</span>Grid View<button id="gear">Settings</button></li><div><ul role="menu"><li role="menuitem" id="nested">Image type</li></ul></div><li role="menuitem" tabindex="-1" class="MuiMenuItem-root" id="native-list"><span class="MuiListItemIcon-root"></span>List View</li></ul>';
+  popup.querySelector('#gear').onclick=e=>{e.stopPropagation();gearClicks++};
+  for(const id of ['grid','native-list'])popup.querySelector('#'+id).onclick=()=>{nativeClicks++;w.localStorage.setItem('native-view',id)};
+  w.document.body.append(popup);await tick();
+  return popup.querySelector('.wallaby-standard-view');
+ };
+ await openMenu();
+ for(let i=0;i<6;i++){
+  const button=await openMenu();assert.equal(button.textContent,'Standard View');button.click();await tick();
+  assert.equal(w.document.querySelectorAll('.wallaby-standard-view').length,1);
+  assert.equal(w.document.querySelectorAll('.wallaby-native-view-overridden').length,2);
+  w.document.getElementById('gear').click();await tick();assert.ok(list.classList.contains('wallaby-cinema-items'));
+  w.document.getElementById(i%2?'grid':'native-list').click();await tick();
+  assert.equal(list.classList.contains('wallaby-cinema-items'),false);
+  assert.equal(w.document.querySelectorAll('.wallaby-native-view-overridden').length,0);
+  assert.equal(list.querySelectorAll('.wallaby-virtual-library').length,1);
+ }
+ assert.equal(nativeClicks,6);assert.equal(gearClicks,6);
+ assert.equal(w.document.querySelector('.wallaby-cinema-toggle'),null);
  const before=frames;await tick();await tick();assert.ok(frames-before<5,`view should settle, not loop (${frames-before} extra frames)`);
  assert.ok(list.querySelectorAll('.wallaby-virtual-card').length<100);
- w.document.querySelector('.wallaby-cinema-toggle').click();await tick();
+ const choice=w.document.querySelector('.wallaby-standard-view');
+ choice.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await tick();
  assert.equal(list.querySelector('.wallaby-cinema-name').textContent,'Movie 0');
  assert.equal(list.querySelector('.wallaby-cinema-year').textContent,'2000');
  assert.equal(w.document.querySelectorAll('.wallaby-cinema-detail').length,1);
+ // Dismiss/reopen the native popup without duplicating or losing the active choice.
+ const reopened=await openMenu();assert.ok(reopened.classList.contains('Mui-selected'));
+ // Logout, another library, then return: preference remains scoped to this user/library.
+ let user='user';w.ApiClient.getCurrentUserId=()=>user;
+ user=null;w.dispatchEvent(new w.Event('focus'));await tick();
+ assert.equal(w.document.querySelector('.wallaby-standard-view'),null);
+ user='other';w.dispatchEvent(new w.Event('focus'));await tick();
+ assert.equal(list.classList.contains('wallaby-cinema-items'),false);
+ user='user';w.dispatchEvent(new w.Event('focus'));await tick();
+ assert.equal(list.classList.contains('wallaby-cinema-items'),true);
+ w.location.hash='#/movies?topParentId=another-library';await tick();
+ assert.equal(list.classList.contains('wallaby-cinema-items'),false);
+ w.location.hash='#/movies?topParentId=movies';await tick();
+ assert.equal(list.classList.contains('wallaby-cinema-items'),true);
+ assert.equal(w.localStorage.getItem(`wallaby.cinema.${w.location.origin}.user.movies`),'cinema');
+ assert.equal(w.localStorage.getItem('native-view'),'grid');
 });
