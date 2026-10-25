@@ -33,8 +33,8 @@
 @media (max-width:1000px) { .wallaby-manage-server { font-size:.85rem; padding:.45rem .55rem; } }
 
 /* Cinema list changes presentation only. Native filters, query, paging and actions remain live. */
-.wallaby-cinema-toggle, .wallaby-cinema-open { font:inherit; cursor:pointer; border:1px solid var(--wallaby-gold); border-radius:.6rem; padding:.65rem 1rem; color:#fff4d9; background:#261636; margin:.5rem; }
-.wallaby-cinema-toggle:focus-visible, .wallaby-cinema-open:focus-visible { outline:2px solid var(--wallaby-teal); outline-offset:3px; }
+.wallaby-cinema-open { font:inherit; cursor:pointer; border:1px solid var(--wallaby-gold); border-radius:.6rem; padding:.65rem 1rem; color:#fff4d9; background:#261636; margin:.5rem; }
+.wallaby-cinema-open:focus-visible { outline:2px solid var(--wallaby-teal); outline-offset:3px; }
 .wallaby-cinema-items { display:block !important; width:43% !important; box-sizing:border-box; }
 .wallaby-cinema-items .card { display:block !important; width:100% !important; margin:0 0 .3rem !important; padding:.75rem 1rem !important; box-sizing:border-box; border-radius:.6rem; border-left:3px solid transparent; min-height:3.25rem; background:rgba(255,255,255,.025); }
 .wallaby-cinema-items .card:hover, .wallaby-cinema-items .card:focus-within { background:#30203e; }
@@ -170,7 +170,7 @@ body.wallaby-library-active .wallaby-cinema-detail {
  max-height:none !important; height:auto !important; overscroll-behavior:contain;
 }
 .wallaby-cinema-row:focus, .wallaby-virtual-card:focus { outline:2px solid var(--wallaby-teal); outline-offset:-2px; }
-.wallaby-cinema-open:focus, .wallaby-cinema-toggle:focus { outline:2px solid var(--wallaby-teal); outline-offset:2px; }
+.wallaby-cinema-open:focus { outline:2px solid var(--wallaby-teal); outline-offset:2px; }
 .wallaby-home-wallpaper { position:fixed; inset:0; z-index:-1; pointer-events:none; background:transparent; }
 .wallaby-home-wallpaper img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 700ms ease; }
 .wallaby-home-wallpaper img.wallaby-art-visible { opacity:1; }
@@ -195,4 +195,8 @@ body.wallaby-home .wallaby-home-content-fade {
 .wallaby-library-toolbar { justify-content:flex-end !important; gap:.65rem; }
 .wallaby-library-toolbar > .MuiStack-root { flex-grow:0 !important; flex-basis:auto !important; }
 .wallaby-library-toolbar > .MuiBox-root { flex-grow:0 !important; }
-.wallaby-library-toolbar > .wallaby-cinema-toggle { flex:none; margin:.25rem 0 .25rem .5rem; }
+/* The custom layout is a peer of the native Grid/List menu entries. */
+#selectview-popover .wallaby-standard-view { display:flex; align-items:center; gap:0; cursor:pointer; }
+#selectview-popover .wallaby-view-check { display:inline-flex; min-width:36px; font-size:24px; }
+#selectview-popover .wallaby-native-view-overridden > .MuiListItemIcon-root { visibility:hidden; }
+#selectview-popover .wallaby-standard-view:focus-visible { outline:2px solid var(--wallaby-teal); outline-offset:-2px; }
