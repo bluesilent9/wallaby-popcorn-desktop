@@ -40,7 +40,7 @@ test('title focus, hover, controls and remembered rows navigate without scrollin
  w.localStorage.setItem(`wallaby.cinema.${w.location.origin}.user.movies`,'cinema');
  for(const name of ['wallaby-library-paging.js','wallaby-artwork.js','wallaby-navigation.js','wallaby-library.js'])w.eval(source(name));
  const render=async()=>{const result=await w.ApiClient.getItems('user',{ParentId:'movies',IncludeItemTypes:'Movie',Limit:100});list.innerHTML=result.Items.map(item=>`<div class="card" data-id="${item.Id}"><a href="#/details?id=${item.Id}"><div class="cardText">${item.Name}</div></a></div>`).join('');};
- const tick=()=>new Promise(r=>setTimeout(r,80));await render();await tick();
+ const tick=()=>new Promise(r=>setTimeout(r,80));await render();await tick();assert.ok(w.document.querySelector('.wallaby-cinema-toggle').parentElement.classList.contains('wallaby-library-toolbar'));
  const key=value=>{const event=new w.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true});w.document.activeElement.dispatchEvent(event);assert.equal(event.defaultPrevented,true);};
  key('ArrowDown');assert.equal(w.document.activeElement.dataset.id,'m0');key('ArrowDown');assert.equal(w.document.activeElement.dataset.id,'m1');await tick();
  key('ArrowRight');assert.equal(w.document.activeElement.className,'wallaby-cinema-open');
@@ -50,7 +50,7 @@ test('title focus, hover, controls and remembered rows navigate without scrollin
  w.document.getElementById('filter').focus();key('ArrowDown');assert.notEqual(w.document.activeElement.id,'filter');assert.equal(w.scrollY,0);
  w.wallabyLibraryPaging.focusIndex(170);await tick();await tick();assert.equal(w.document.activeElement.dataset.id,'m170');assert.equal(w.wallabyLibrary.snapshot().index,170);
  const video=w.document.querySelector('.wallaby-media-badge');assert.equal(video.textContent,'720p · H.264');assert.ok(!video.textContent.includes('1280'));assert.ok(w.document.querySelectorAll('.wallaby-media-badge')[1].textContent.includes('116 kb/s'));
- w.document.querySelector('.wallaby-cinema-open').click();await tick();assert.ok(w.location.hash.includes('details'));w.wallabyNavigation.command('back');await tick();await render();await tick();await tick();assert.equal(w.document.activeElement.dataset.id,'m170','Escape restores the previous title beyond the first batch');
+ w.document.querySelector('.wallaby-cinema-row[data-id="m170"] .wallaby-cinema-name').click();await tick();assert.ok(w.location.hash.includes('details'));w.wallabyNavigation.command('back');await tick();await render();await tick();await tick();assert.equal(w.document.activeElement.dataset.id,'m170','Escape restores the previous title beyond the first batch');
  assert.equal(w.scrollY,0);assert.ok(list.classList.contains('wallaby-library-viewport'));
 });
 
@@ -63,7 +63,7 @@ test('Home hover waits before fanart and returns to Wallaby artwork after leavin
  const tick=()=>new Promise(r=>setTimeout(r,35));
  w.document.querySelector('.card').dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));await tick();assert.deepEqual(loaded,[]);assert.ok(tasks.at(-1).delay>900);
  await tasks.at(-1).fn();await tick();assert.deepEqual(loaded,['film.jpg']);assert.equal(w.document.querySelector('.wallaby-home-wallpaper img').getAttribute('src'),'film.jpg');
- w.document.querySelector('.library').dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));assert.equal(tasks.at(-1).delay,0);await tasks.at(-1).fn();await tick();assert.equal(loaded.at(-1),'wallaby.png');
+ w.document.querySelector('.library').dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));assert.ok(tasks.at(-1).delay>900); assert.equal(loaded.at(-1),'film.jpg');await tasks.at(-1).fn();await tick();assert.equal(loaded.at(-1),'wallaby.png');
 });
 
 test('Home library tiles use Wallaby art while films, episodes and series retain fanart',()=>{
