@@ -65,7 +65,7 @@
     if (typeof window === 'undefined') return;
 
     window.wallabyLibraryRoute = libraryRoute;
-    let container, panel, toggle, selected, backdrop, backdropPage, selectedId = '', lastQuery = '', selectedIndex = 0, fadeCleanup, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
+    let container, panel, selected, backdrop, backdropPage, selectedId = '', lastQuery = '', selectedIndex = 0, fadeCleanup, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
     const visible = node => node && node.getClientRects().length && !node.closest('.hide, [hidden], [aria-hidden="true"]');
     const cards = () => container ? [...container.querySelectorAll('.card[data-id], .listItem[data-id], .wallaby-cinema-row[data-id]')] : [];
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
@@ -74,6 +74,8 @@
         if (text) node.textContent = text;
         return node;
     }
+    // Retain the existing key/values: historical 'cinema' is the new Standard View.
+    // Native Grid/List settings remain owned and persisted by Jellyfin.
     function remember(value) { try { localStorage.setItem(key, value ? 'cinema' : 'standard'); } catch (_) {} }
     function cleanup() {
         generation++;
@@ -88,20 +90,52 @@
         window.wallabyLibrary = null;
         container?.querySelectorAll('.wallaby-cinema-selected').forEach(card => card.classList.remove('wallaby-cinema-selected'));
         container?.querySelectorAll('.wallaby-cinema-caption').forEach(node => node.remove());
-        panel?.remove(); toggle?.remove(); container = panel = toggle = selected = null; selectedId = ''; lastQuery = '';
+        panel?.remove(); container = panel = selected = null;
+        document.querySelectorAll('.wallaby-standard-view').forEach(node => node.remove());
+        document.querySelectorAll('.wallaby-native-view-overridden').forEach(node => node.classList.remove('wallaby-native-view-overridden')); selectedId = ''; lastQuery = '';
         document.body?.classList.remove('wallaby-library-active');
     }
-    function placeToggle() {
+    const boundViewRows = new WeakSet();
+    function syncViewMenu() {
+        if (!container || !libraryRoute(location.hash)) return;
+        const menu = document.querySelector('#selectview-popover [role="menu"]');
+        if (!menu) return;
+        // Only direct Grid/List rows; nested image settings and the gear stay native.
+        const rows = [...menu.children].filter(node => node.getAttribute('role') === 'menuitem' && !node.classList.contains('wallaby-standard-view'));
+        if (rows.length !== 2) return;
+        for (const row of rows) {
+            if (row.classList.contains('wallaby-native-view-overridden') !== enabled) row.classList.toggle('wallaby-native-view-overridden', enabled);
+            if (!boundViewRows.has(row)) {
+                boundViewRows.add(row);
+                row.addEventListener('click', event => {
+                    if (event.target.closest('button, [role="button"]')) return;
+                    enabled = false; remember(false); render();
+                }, true);
+            }
+        }
+        let choice = menu.querySelector(':scope > .wallaby-standard-view');
+        if (!choice) {
+            choice = element('li', rows[0].className.replace('wallaby-native-view-overridden', '').replace('Mui-selected', '') + ' wallaby-standard-view');
+            choice.setAttribute('role', 'menuitem'); choice.tabIndex = -1;
+            choice.append(element('span', 'wallaby-view-check'), element('span', '', 'Standard View'));
+            choice.firstElementChild.setAttribute('aria-hidden', 'true');
+            const activate = event => { event.preventDefault(); event.stopPropagation(); enabled = true; remember(true); render(); choice.focus({ preventScroll: true }); };
+            choice.addEventListener('click', activate);
+            choice.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') activate(event); });
+            menu.append(choice);
+        }
+        setText(choice.firstElementChild, enabled ? '✓' : '');
+        if (choice.classList.contains('Mui-selected') !== enabled) choice.classList.toggle('Mui-selected', enabled);
+    }
+    function prepareToolbar() {
         const toolbar = document.querySelector('.MuiAppBar-root > .MuiToolbar-root:nth-child(2)') || document.querySelector('.toolbar');
-        if (!toolbar || !toggle) return;
-        if (!toolbar.classList.contains('wallaby-library-toolbar')) toolbar.classList.add('wallaby-library-toolbar');
-        if (toggle.parentElement !== toolbar || toggle.previousElementSibling !== toolbar.firstElementChild) toolbar.insertBefore(toggle, toolbar.children[1] || null);
+        if (toolbar && !toolbar.classList.contains('wallaby-library-toolbar')) toolbar.classList.add('wallaby-library-toolbar');
     }
     function position() {
         if (!container) return;
-        placeToggle();
+        prepareToolbar();
         const toolbar = [...document.querySelectorAll('.MuiToolbar-root.padded-left.padded-right, .libraryPage .pageTabContent .sectionTitleContainer, .toolbar')].filter(visible);
-        const top = Math.min(innerHeight * .35, Math.max(56, toggle?.getBoundingClientRect().bottom || 0, ...toolbar.map(node => node.getBoundingClientRect().bottom)) + 12);
+        const top = Math.min(innerHeight * .35, Math.max(56, ...toolbar.map(node => node.getBoundingClientRect().bottom)) + 12);
         document.body.style.setProperty('--wallaby-library-top', `${top}px`);
         const bounds = container.parentElement.getBoundingClientRect();
         const left = Math.max(24, bounds.left), width = Math.max(300, Math.min(innerWidth - left - 24, bounds.width || innerWidth - left * 2));
@@ -299,8 +333,7 @@
     }
     function render() {
         if (container.classList.contains('wallaby-cinema-items') !== enabled) container.classList.toggle('wallaby-cinema-items', enabled);
-        toggle.setAttribute('aria-pressed', String(enabled));
-        setText(toggle, enabled ? 'Standard library view' : 'Cinema list');
+        syncViewMenu();
         if (!document.body?.classList.contains('wallaby-library-active')) document.body?.classList.add('wallaby-library-active');
         if (!enabled) { if (backdrop || panel) { clearBackdrop(); generation++; } panel?.remove(); panel = selected = null; selectedId = '';
             window.wallabyLibraryPaging?.attach(container, select, openItem, { mode: 'native' });
@@ -343,10 +376,6 @@
         if (container !== next || key !== nextKey) {
             cleanup(); container = next; key = nextKey;
             try { enabled = localStorage.getItem(key) === 'cinema'; } catch (_) { enabled = false; }
-            toggle = element('button', 'wallaby-cinema-toggle'); toggle.type = 'button';
-            toggle.addEventListener('click', () => { enabled = !enabled; remember(enabled); render(); });
-            container.before(toggle);
-            toggle.addEventListener('pointerover', hover);
             container.classList.add('wallaby-library-viewport');
             for (let node = container.parentElement; node && node !== document.body; node = node.parentElement) node.classList.add('wallaby-library-shell');
             container.addEventListener('click', intercept, true); container.addEventListener('focusin', focusTitle);
@@ -356,7 +385,7 @@
         render();
     }
     function schedule(records) {
-        if (Array.isArray(records) && records.every(record => record.target.closest?.('.wallaby-cinema-detail, .wallaby-cinema-toggle, .wallaby-cinema-caption, .wallaby-virtual-library'))) return;
+        if (Array.isArray(records) && records.every(record => record.target.closest?.('.wallaby-cinema-detail, .wallaby-standard-view, .wallaby-cinema-caption, .wallaby-virtual-library'))) return;
         if (scheduled) return; scheduled = true;
         requestAnimationFrame(() => { scheduled = false; sync(); });
     }
