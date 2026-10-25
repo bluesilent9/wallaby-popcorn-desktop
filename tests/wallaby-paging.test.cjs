@@ -101,3 +101,18 @@ test('native layouts retain item actions and hide changing toolbar counts across
     assert.equal(list.querySelectorAll('[data-wallaby-original-id]').length,0);
     w.close();
 });
+
+test('repeated 50-item SDK refreshes and native innerHTML repaints keep loaded rows and scroll cache',{skip:!dependency},async t=>{
+ const {JSDOM}=require(dependency);const dom=new JSDOM('<main><div class="itemsContainer"></div></main>',{url:'http://[::1]:8096/web/#/movies?topParentId=movies',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window,list=w.document.querySelector('.itemsContainer');
+ const all=Array.from({length:1171},(_,i)=>({Id:`m${i}`,Name:`Movie ${i}`})),query={ParentId:'movies',IncludeItemTypes:'Movie',Limit:50,SortOrder:'Ascending'};const calls=[];
+ const native=()=>all.slice(0,50).map(item=>`<div class="card" data-id="${item.Id}"><span class="cardText">${item.Name}</span></div>`).join('');list.innerHTML=native();
+ w.ApiClient={getCurrentUserId:()=> 'user',getItems:async(user,q)=>{calls.push({...q});return {Items:all.slice(Number(q.StartIndex||0),Number(q.StartIndex||0)+Number(q.Limit)),TotalRecordCount:1171}}};w.wallabyLibraryRoute=()=> 'movies';w.performance.getEntriesByType=()=>[];
+ w.HTMLElement.prototype.getBoundingClientRect=function(){return {top:this.classList.contains('wallaby-virtual-library')?-list.scrollTop:0,width:600,height:64,bottom:64,left:0,right:600}};
+ w.eval(fs.readFileSync(path.join(__dirname,'../native/wallaby-library-paging.js'),'utf8'));await w.ApiClient.getItems('user',query);
+ const attach=()=>w.wallabyLibraryPaging.attach(list,()=>{},()=>{});w.addEventListener('wallaby-library-query',attach);attach();const tick=()=>new Promise(r=>setTimeout(r,35));await tick();await tick();
+ list.scrollTop=640*64;w.dispatchEvent(new w.Event('scroll'));await tick();await tick();
+ assert.ok(list.textContent.includes('Movie 640'));const host=list.querySelector('.wallaby-virtual-library'),before=calls.filter(q=>q.Limit===100).length;
+ for(let i=0;i<4;i++){await w.ApiClient.getItems('user',{...query});await tick();assert.equal(list.querySelector('.wallaby-virtual-library'),host);assert.ok(!host.textContent.includes('Loading titles'));}
+ assert.equal(calls.filter(q=>q.Limit===100).length,before,'refresh must not refetch a cached viewport');
+ list.innerHTML=native();list.scrollTop=0;attach();await tick();assert.equal(list.scrollTop,640*64);assert.ok(list.textContent.includes('Movie 640'));assert.ok(!list.querySelector('.wallaby-virtual-library').textContent.includes('Loading titles'));
+});
