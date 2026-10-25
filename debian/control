@@ -5,7 +5,8 @@ Maintainer: Wallaby Suite <bluesilent9@users.noreply.github.com>
 Build-Depends: debhelper (>= 10), cmake, ninja-build, g++, pkg-config,
                python3, qt6-base-dev, qt6-base-private-dev,
                qt6-declarative-dev, qt6-webengine-dev, qt6-wayland-dev,
-               libmpv-dev, libcec-dev, libxrandr-dev, libgl-dev, libegl-dev
+               libmpv-dev, libcec-dev, libsdl2-dev, libminizip-dev,
+               libxrandr-dev, libgl-dev, libegl-dev
 Standards-Version: 4.6.0
 Homepage: https://github.com/bluesilent9/wallaby-popcorn-desktop
 Vcs-Git: https://github.com/bluesilent9/wallaby-popcorn-desktop.git
