@@ -50,3 +50,54 @@ test('modern SDK recovery, 1171 titles, bounded rows/cache, filters, and restori
     assert.ok(!w.document.querySelector('.MuiChip-label').classList.contains('wallaby-cinema-paging-hidden'));
     w.close();
 });
+
+test('initial native requests are bounded without changing filters or caller settings', () => {
+    const { boundedQuery } = require('../native/wallaby-library-paging.js');
+    for (const size of [0, 500, 1000]) {
+        const query={ParentId:'movies',Limit:size,GenreIds:'comedy',SearchTerm:'wallaby'};
+        assert.equal(boundedQuery(query).Limit,100);
+        assert.equal(query.Limit,size);
+        assert.equal(boundedQuery(query).GenreIds,'comedy');
+    }
+    assert.equal(boundedQuery({Limit:24}).Limit,24,'small home shelves stay small');
+});
+
+test('native layouts retain item actions and hide changing toolbar counts across view switches', {skip:!dependency}, async t => {
+    const {JSDOM}=require(dependency);
+    const dom=new JSDOM('<header><div class="MuiToolbar-root padded-left padded-right"><div class="MuiChip-root"><span class="MuiChip-label">1-100 of 1,171</span></div><button title="Next"></button><button id="filters">Filters</button></div></header><main class="page"><div class="itemsContainer centered"></div></main>',{url:'http://[::1]:8096/web/#/movies?topParentId=movies',runScripts:'outside-only',pretendToBeVisual:true});
+    t.after(()=>dom.window.close());
+    const w=dom.window,list=w.document.querySelector('.itemsContainer');
+    const all=Array.from({length:1171},(_,i)=>({Id:`movie-${i}`,Type:'Movie',Name:`Movie ${i}`,ProductionYear:2000+i%20,ImageTags:{Primary:`art-${i}`},UserData:{Played:i%2===0}}));
+    list.innerHTML=all.slice(0,100).map(item=>`<div class="card portraitCard" data-id="${item.Id}" data-type="Movie"><a class="cardImageContainer itemAction" data-id="${item.Id}" href="#/details?id=${item.Id}" style="background-image:url('/Items/${item.Id}/Images/Primary')"></a><div class="cardText"><a>${item.Name}</a></div><div class="cardText">${item.ProductionYear}</div><button class="itemAction" data-action="play" data-id="${item.Id}">Play</button></div>`).join('');
+    let top=0;
+    w.HTMLElement.prototype.getBoundingClientRect=function(){return {top:this.classList.contains('wallaby-virtual-library')?top:0,bottom:300,width:this.classList.contains('card')?180:900,height:this.classList.contains('card')?300:64}};
+    const calls=[];
+    w.wallabyLibraryRoute=()=> 'movies';
+    w.ApiClient={getCurrentUserId:()=> 'user',serverId:()=> 'server',getImageUrl:(id)=>`/Items/${id}/Images/Primary`,getItems:async(user,q)=>{calls.push({...q});return {Items:all.slice(Number(q.StartIndex||0),Number(q.StartIndex||0)+Number(q.Limit)),TotalRecordCount:1171}}};
+    w.eval(fs.readFileSync(path.join(__dirname,'../native/wallaby-library-paging.js'),'utf8'));
+    await w.ApiClient.getItems('user',{ParentId:'movies',IncludeItemTypes:'Movie',Limit:1000,SortOrder:'Descending'});
+    assert.equal(calls[0].Limit,100);
+    w.performance.getEntriesByType=()=>[];
+    let mode='native';
+    const attach=()=>w.wallabyLibraryPaging.attach(list,()=>{},()=>{},{mode});
+    w.addEventListener('wallaby-library-query',attach);attach();
+    const tick=()=>new Promise(resolve=>setTimeout(resolve,40));await tick();
+    assert.ok(w.document.querySelector('.MuiChip-root').classList.contains('wallaby-cinema-paging-hidden'));
+    assert.ok(!w.document.getElementById('filters').classList.contains('wallaby-cinema-paging-hidden'));
+    assert.ok(list.querySelectorAll('.wallaby-virtual-card').length<100);
+    assert.equal(list.querySelectorAll('.card[data-id="movie-0"]').length,1,'hidden originals cannot duplicate actionable IDs');
+    top=-88000;w.dispatchEvent(new w.Event('scroll'));await tick();await tick();
+    const card=list.querySelector('.wallaby-virtual-card');
+    assert.ok(card && Number(card.dataset.id.split('-')[1])>100);
+    assert.equal(card.querySelector('button').dataset.id,card.dataset.id);
+    assert.ok(card.querySelector('a').getAttribute('href').includes(card.dataset.id));
+    assert.ok(card.querySelector('.cardImageContainer').style.backgroundImage.includes(card.dataset.id));
+    assert.equal(card.querySelector('.cardText').textContent,`Movie ${card.dataset.id.split('-')[1]}`);
+    for(let i=0;i<4;i++) {mode=i%2?'native':'cinema';w.document.querySelector('.MuiChip-label').textContent=i%2?'50':'1-100 of 1,171';attach();await tick();}
+    assert.ok(w.document.querySelector('.MuiChip-root').classList.contains('wallaby-cinema-paging-hidden'));
+    assert.equal(list.querySelectorAll('.wallaby-virtual-library').length,1);
+    assert.ok(calls.every(q=>q.Limit===100 && q.SortOrder==='Descending'));
+    w.wallabyLibraryPaging.reset();assert.equal(list.querySelectorAll('.card[data-id]').length,100);
+    assert.equal(list.querySelectorAll('[data-wallaby-original-id]').length,0);
+    w.close();
+});
