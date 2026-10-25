@@ -30,7 +30,6 @@ test('title focus, hover, controls and remembered rows navigate without scrollin
   if(this.classList.contains('wallaby-virtual-library'))return rect(30,150-list.scrollTop,400,400);
   if(this.dataset.wallabyIndex!==undefined)return rect(30,150+Number(this.dataset.wallabyIndex)*64-list.scrollTop,400,64);
   if(this.classList.contains('wallaby-cinema-open'))return rect(550,500,220,50);
-  if(this.classList.contains('wallaby-cinema-toggle'))return rect(30,80,180,40);
   if(this.id==='filter')return rect(30,20,100,40);if(this.id==='sort')return rect(170,20,100,40);
   return rect(0,0,1000,100);
  };
@@ -40,7 +39,7 @@ test('title focus, hover, controls and remembered rows navigate without scrollin
  w.localStorage.setItem(`wallaby.cinema.${w.location.origin}.user.movies`,'cinema');
  for(const name of ['wallaby-library-paging.js','wallaby-artwork.js','wallaby-navigation.js','wallaby-library.js'])w.eval(source(name));
  const render=async()=>{const result=await w.ApiClient.getItems('user',{ParentId:'movies',IncludeItemTypes:'Movie',Limit:100});list.innerHTML=result.Items.map(item=>`<div class="card" data-id="${item.Id}"><a href="#/details?id=${item.Id}"><div class="cardText">${item.Name}</div></a></div>`).join('');};
- const tick=()=>new Promise(r=>setTimeout(r,80));await render();await tick();assert.ok(w.document.querySelector('.wallaby-cinema-toggle').parentElement.classList.contains('wallaby-library-toolbar'));
+ const tick=()=>new Promise(r=>setTimeout(r,80));await render();await tick();assert.equal(w.document.querySelector('.wallaby-cinema-toggle'),null);assert.ok(w.document.querySelector('.toolbar').classList.contains('wallaby-library-toolbar'));
  const key=value=>{const event=new w.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true});w.document.activeElement.dispatchEvent(event);assert.equal(event.defaultPrevented,true);};
  key('ArrowDown');assert.equal(w.document.activeElement.dataset.id,'m0');key('ArrowDown');assert.equal(w.document.activeElement.dataset.id,'m1');await tick();
  key('ArrowRight');assert.equal(w.document.activeElement.className,'wallaby-cinema-open');
