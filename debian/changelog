@@ -1,3 +1,12 @@
+wallaby-popcorn (2.0.0-0wallaby6) UNRELEASED; urgency=medium
+
+  * Add Standard View to Jellyfin's existing Grid/List view settings menu.
+  * Preserve per-library view preferences across sign-ins; retain existing
+    custom-view preferences and native Grid/List persistence.
+  * Remove the separate layout toggle without changing filters or item actions.
+
+ -- Wallaby Suite <bluesilent9@users.noreply.github.com>  Mon, 26 Oct 2026 20:00:00 +1100
+
 wallaby-popcorn (2.0.0-0wallaby5) UNRELEASED; urgency=medium
 
   * Preserve virtual-library cache and scroll through repeated SDK responses and
