@@ -1,0 +1,26 @@
+name: Publish desktop source only (no build)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify and publish the prepared Development source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'This job publishes existing source objects only. It does not configure, compile, test or package the app.'
+          echo '641b0a14e1f77f3e48c6ef41e5e3f350c804c4ea22fb9e2e2d58196d3a61db56  wallaby-popcorn-desktop-source.bundle' | sha256sum -c -
+          git bundle verify wallaby-popcorn-desktop-source.bundle
+          git fetch ./wallaby-popcorn-desktop-source.bundle Development:refs/remotes/source-kit/Development
+          expected=c246e6a3226a2127e869de391f8e0b0dbd1c6833
+          test "$(git rev-parse refs/remotes/source-kit/Development)" = "$expected"
+          test "$(git rev-parse origin/Development)" = 1634d3d263b881dccc62bf278d1289b471ec7af1
+          git diff --exit-code origin/Development "$expected" -- .github/workflows
+          git merge-base --is-ancestor origin/Development "$expected"
+          git push origin "$expected":refs/heads/Development
