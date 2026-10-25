@@ -176,3 +176,23 @@ body.wallaby-library-active .wallaby-cinema-detail {
 .wallaby-home-wallpaper img.wallaby-art-visible { opacity:1; }
 .wallaby-home-wallpaper::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,rgba(15,8,25,.78),rgba(15,8,25,.5)),linear-gradient(0deg,rgba(15,8,25,.8),rgba(15,8,25,.25)); }
 @media(prefers-reduced-motion:reduce) { .wallaby-home-wallpaper img { transition:none; } }
+
+/* Home header: preserve the real server and account actions, simplify their presentation. */
+.wallaby-home-nav-hidden { display:none !important; }
+body.wallaby-home .wallaby-user-box {
+ display:inline-flex !important; align-items:center; gap:.7rem; padding:.35rem .85rem .35rem .4rem !important;
+ border:1px solid rgba(246,198,106,.45); border-radius:.75rem !important;
+ background:rgba(22,13,34,.7); color:#fff4d9; box-shadow:0 .2rem .8rem rgba(0,0,0,.18);
+}
+.wallaby-user-name { font:600 .95rem/1.25 'Noto Sans',sans-serif; text-transform:none; white-space:nowrap; }
+.wallaby-user-box .MuiAvatar-root { flex-shrink:0; }
+/* Mask content itself, keeping the header and wallpaper fully visible. */
+body.wallaby-home .wallaby-home-content-fade {
+ mask-image:linear-gradient(to bottom,transparent var(--wallaby-fade-start,0px),#000 var(--wallaby-fade-end,20px));
+ -webkit-mask-image:linear-gradient(to bottom,transparent var(--wallaby-fade-start,0px),#000 var(--wallaby-fade-end,20px));
+}
+/* A single right-aligned library toolbar; native dropdown/filter/menu handlers stay in place. */
+.wallaby-library-toolbar { justify-content:flex-end !important; gap:.65rem; }
+.wallaby-library-toolbar > .MuiStack-root { flex-grow:0 !important; flex-basis:auto !important; }
+.wallaby-library-toolbar > .MuiBox-root { flex-grow:0 !important; }
+.wallaby-library-toolbar > .wallaby-cinema-toggle { flex:none; margin:.25rem 0 .25rem .5rem; }
