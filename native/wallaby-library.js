@@ -65,9 +65,9 @@
     if (typeof window === 'undefined') return;
 
     window.wallabyLibraryRoute = libraryRoute;
-    let container, panel, toggle, selected, backdrop, backdropPage, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
+    let container, panel, toggle, selected, backdrop, backdropPage, selectedId = '', lastQuery = '', fadeCleanup, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
     const visible = node => node && node.getClientRects().length && !node.closest('.hide, [hidden], [aria-hidden="true"]');
-    const cards = () => container ? [...container.querySelectorAll('.card[data-id], .wallaby-cinema-row[data-id]')] : [];
+    const cards = () => container ? [...container.querySelectorAll('.card[data-id], .listItem[data-id], .wallaby-cinema-row[data-id]')] : [];
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
     function element(tag, className, text) {
         const node = document.createElement(tag); node.className = className;
@@ -84,7 +84,8 @@
         container?.removeEventListener('keydown', keyboard, true);
         container?.querySelectorAll('.wallaby-cinema-selected').forEach(card => card.classList.remove('wallaby-cinema-selected'));
         container?.querySelectorAll('.wallaby-cinema-caption').forEach(node => node.remove());
-        panel?.remove(); toggle?.remove(); container = panel = toggle = selected = null;
+        panel?.remove(); toggle?.remove(); container = panel = toggle = selected = null; selectedId = ''; lastQuery = '';
+        document.body?.classList.remove('wallaby-library-active');
     }
     function position() {
         if (!panel || !container) return;
@@ -104,32 +105,44 @@
         if (serverId) params.set('serverId', serverId);
         location.hash = `#/details?${params}`;
     }
-    function caption(card) {
-        if (card.querySelector('.wallaby-cinema-caption') || card.classList.contains('wallaby-cinema-row')) return;
-        const lines = [...card.querySelectorAll('.cardText')].map(node => node.textContent.trim()).filter(Boolean);
-        const model = window.wallabyLibraryPaging?.item(card.dataset.id);
-        const title = model?.Name || lines[0] || card.querySelector('[title]')?.title || card.getAttribute('aria-label') || 'Untitled';
-        const node = element('span', 'wallaby-cinema-caption');
-        node.append(element('span', 'wallaby-cinema-name', title));
-        if (model?.ProductionYear || lines[1]) node.append(element('span', 'wallaby-cinema-year', String(model?.ProductionYear || lines[1])));
-        card.append(node);
-    }
+    const artwork = window.wallabyArtwork.createArtworkScheduler({
+        load: url => new Promise((resolve, reject) => {
+            const image = new Image(); image.alt = '';
+            image.onload = async () => { try { await image.decode?.(); } catch (_) {} resolve(image); };
+            image.onerror = reject; image.src = url;
+        }),
+        show: image => {
+            if (!enabled || !container?.isConnected) return;
+            if (!backdrop?.isConnected) {
+                backdropPage = container.closest('.page') || container.parentElement;
+                backdropPage.classList.add('wallaby-cinema-backdrop-page');
+                backdrop = element('div', 'wallaby-cinema-wallpaper'); backdrop.setAttribute('aria-hidden', 'true');
+                backdropPage.prepend(backdrop);
+            }
+            clearTimeout(fadeCleanup);
+            const previous = [...backdrop.querySelectorAll('img')];
+            previous.slice(0, -1).forEach(node => node.remove());
+            const old = previous.at(-1);
+            backdrop.append(image);
+            // Commit the transparent start state before the next frame begins its fade.
+            image.getBoundingClientRect();
+            requestAnimationFrame(() => {
+                if (!image.isConnected) return;
+                image.classList.add('wallaby-art-visible'); old?.classList.remove('wallaby-art-visible');
+            });
+            fadeCleanup = setTimeout(() => { old?.remove(); backdrop?.classList.add('wallaby-fanart-ready'); }, 750);
+        }
+    });
     function clearBackdrop() {
+        artwork.cancel(); clearTimeout(fadeCleanup);
         backdrop?.remove(); backdrop = null;
         backdropPage?.classList.remove('wallaby-cinema-backdrop-page'); backdropPage = null;
     }
-    function showBackdrop(item) {
-        clearBackdrop();
+    function showBackdrop(item, selectedAt) {
         const id = item.BackdropImageTags?.length ? item.Id : item.ParentBackdropItemId;
         const tag = item.BackdropImageTags?.[0] || item.ParentBackdropImageTags?.[0];
-        if (!id || !tag) return;
-        backdropPage = container.closest('.page') || container.parentElement;
-        backdropPage.classList.add('wallaby-cinema-backdrop-page');
-        backdrop = element('div', 'wallaby-cinema-wallpaper'); backdrop.setAttribute('aria-hidden', 'true');
-        const image = element('img', ''); image.alt = '';
-        image.src = window.ApiClient.getImageUrl(id, { type: 'Backdrop', maxWidth: 2560, tag });
-        image.addEventListener('error', () => { if (backdrop?.contains(image)) clearBackdrop(); }, { once: true });
-        backdrop.append(image); backdropPage.prepend(backdrop);
+        const url = id && tag ? window.ApiClient.getImageUrl(id, { type: 'Backdrop', maxWidth: 2560, tag }) : window.jmpInfo?.branding?.homeBackdrop;
+        if (url) artwork.select(url, Math.max(0, 1000 - (Date.now() - selectedAt)));
     }
     function mediaIcon(type) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -176,16 +189,17 @@
     }
     async function select(card) {
         if (!card || !enabled || selected === card) return;
-        selected?.classList.remove('wallaby-cinema-selected'); selected = card;
+        if (selectedId === card.dataset.id && panel?.children.length) { selected = card; card.classList.add('wallaby-cinema-selected'); return; }
+        selected?.classList.remove('wallaby-cinema-selected'); selected = card; selectedId = card.dataset.id;
+        const selectedAt = Date.now(); artwork.cancel();
         card.classList.add('wallaby-cinema-selected');
         const ticket = ++generation;
-        clearBackdrop();
         panel.replaceChildren(element('p', 'wallaby-cinema-status', 'Loading details…'));
         try {
             const item = await window.ApiClient.getItem(window.ApiClient.getCurrentUserId(), card.dataset.id);
             if (ticket !== generation || !enabled || !panel?.isConnected) return;
             panel.replaceChildren();
-            showBackdrop(item);
+            showBackdrop(item, selectedAt);
             const imageType = item.ImageTags?.Primary ? 'Primary' : item.BackdropImageTags?.length ? 'Backdrop' : null;
             if (imageType) {
                 const image = element('img', `wallaby-cinema-art ${imageType === 'Backdrop' ? 'wallaby-cinema-backdrop' : ''}`);
@@ -209,12 +223,12 @@
             if (ticket !== generation || !panel?.isConnected) return;
             panel.replaceChildren(element('p', 'wallaby-cinema-status', 'Couldn’t load details. Check the server connection and try again.'));
             const retry = element('button', 'wallaby-cinema-open', 'Retry'); retry.type = 'button';
-            retry.addEventListener('click', () => { selected = null; select(card); }); panel.append(retry);
+            retry.addEventListener('click', () => { selected = null; selectedId = ''; select(card); }); panel.append(retry);
         }
     }
     function intercept(event) {
         if (opening || !enabled || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-        const card = event.target.closest('.card[data-id], .wallaby-cinema-row[data-id]');
+        const card = event.target.closest('.card[data-id], .listItem[data-id], .wallaby-cinema-row[data-id]');
         if (!card || !container.contains(card)) return;
         // Keep play, context menu, watched/favourite and selection controls native.
         if (event.target.closest('button, input, [data-action]:not([data-action="link"]), .cardOverlayButton')) return;
@@ -228,19 +242,28 @@
         if (next) { event.preventDefault(); event.stopImmediatePropagation(); (next.querySelector('a[href], [tabindex]') || next).focus({ preventScroll: true }); select(next); next.scrollIntoView({ block: 'nearest' }); }
     }
     function render() {
-        container.classList.toggle('wallaby-cinema-items', enabled);
+        if (container.classList.contains('wallaby-cinema-items') !== enabled) container.classList.toggle('wallaby-cinema-items', enabled);
         toggle.setAttribute('aria-pressed', String(enabled));
         setText(toggle, enabled ? 'Standard library view' : 'Cinema list');
-        if (!enabled) { clearBackdrop(); window.wallabyLibraryPaging?.reset(); generation++; panel?.remove(); panel = selected = null;
+        if (!document.body?.classList.contains('wallaby-library-active')) document.body?.classList.add('wallaby-library-active');
+        if (!enabled) { if (backdrop || panel) { clearBackdrop(); generation++; } panel?.remove(); panel = selected = null; selectedId = '';
+            window.wallabyLibraryPaging?.attach(container, select, openItem, { mode: 'native' });
             container.querySelectorAll('.wallaby-cinema-caption').forEach(node => node.remove()); return; }
         if (!panel) {
             panel = element('aside', 'wallaby-cinema-detail'); panel.setAttribute('aria-label', 'Selected title details');
             panel.setAttribute('aria-live', 'polite'); container.after(panel);
         }
-        window.wallabyLibraryPaging?.attach(container, select, openItem);
-        cards().forEach(caption);
-        if (!selected?.isConnected || !container.contains(selected)) { selected = null; select(cards().find(visible)); }
-        if (!cards().length) { clearBackdrop(); generation++; selected = null; setText(panel, 'No titles in this view. Try changing Jellyfin’s filters.'); }
+        window.wallabyLibraryPaging?.attach(container, select, openItem, { mode: 'cinema' });
+        const query = window.wallabyLibraryPaging?.queryKey();
+        if (query && lastQuery && query !== lastQuery) { selected = null; selectedId = ''; }
+        if (query) lastQuery = query;
+        const current = cards().find(card => card.dataset.id === selectedId && visible(card));
+        if (current) { selected = current; current.classList.add('wallaby-cinema-selected'); }
+        if (!selectedId) { selected = null; select(cards().find(visible)); }
+        if (!cards().length && !selectedId) {
+            const status = window.wallabyLibraryPaging?.status();
+            setText(panel, status?.total === 0 ? 'No titles in this view. Try changing Jellyfin’s filters.' : 'Loading titles…');
+        }
         position();
     }
     function sync() {
@@ -249,9 +272,9 @@
         const user = client?.getCurrentUserId?.();
         const nextKey = library && user ? `wallaby.cinema.${client.serverAddress()}.${user}.${library}` : '';
         // Never apply to dashboard, search, home, genre shelves or playback overlays.
-        const candidates = nextKey ? [...document.querySelectorAll('.itemsContainer')].filter(node => visible(node) && node.querySelector('.card[data-id]') &&
+        const candidates = nextKey ? [...document.querySelectorAll('.itemsContainer')].filter(node => visible(node) && node.querySelector('.card[data-id], .listItem[data-id]') &&
             !node.closest('.horizontalItemsContainer, .scrollSlider, .hide, [hidden]')) : [];
-        const next = candidates.sort((a, b) => b.querySelectorAll('.card[data-id]').length - a.querySelectorAll('.card[data-id]').length)[0] ||
+        const next = candidates.sort((a, b) => b.querySelectorAll('.card[data-id], .listItem[data-id]').length - a.querySelectorAll('.card[data-id], .listItem[data-id]').length)[0] ||
             (container?.isConnected && visible(container) && key === nextKey ? container : null);
         if (!nextKey || !next) { if (container && (!nextKey || !container.isConnected)) cleanup(); return; }
         if (container !== next || key !== nextKey) {
@@ -270,7 +293,7 @@
         requestAnimationFrame(() => { scheduled = false; sync(); });
     }
     function start() {
-        new MutationObserver(records => schedule(records)).observe(document.documentElement, { childList: true, subtree: true });
+        new MutationObserver(records => schedule(records)).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         window.addEventListener('hashchange', () => { cleanup(); schedule(); });
         window.addEventListener('wallaby-library-query', () => schedule());
         window.addEventListener('resize', position); window.addEventListener('scroll', position, true);

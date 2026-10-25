@@ -1,6 +1,6 @@
 /* Wallaby Popcorn: presentation only; keep Jellyfin layout and player behaviour. */
 :root { --wallaby-night:#160d22; --wallaby-panel:#261636; --wallaby-gold:#f6c66a; --wallaby-teal:#67d6cc; }
-.skinHeader, .mainDrawer { background-color:var(--wallaby-night) !important; }
+.mainDrawer { background-color:var(--wallaby-night) !important; }
 .backgroundContainer { background-color:var(--wallaby-night) !important; }
 .button-submit, .button-accent { background:var(--wallaby-gold) !important; color:#160d22 !important; }
 .emby-tab-button-active, .navMenuOption-selected { color:var(--wallaby-gold) !important; }
@@ -95,3 +95,58 @@
 .wallaby-cinema-row .wallaby-cinema-name { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; text-align:left; }
 .wallaby-cinema-row .wallaby-cinema-year { margin-left:auto; flex:none; }
 .wallaby-cinema-paging-hidden { display:none !important; }
+
+/* Keep the media toolbar transparent even when the web client applies its scrolled state. */
+body.wallaby-media-surface .skinHeader,
+body.wallaby-media-surface .headerTop,
+body.wallaby-media-surface .headerTabs,
+body.wallaby-media-surface .MuiAppBar-root,
+body.wallaby-media-surface .MuiAppBar-root .MuiToolbar-root,
+body.wallaby-media-surface .MuiToolbar-root.padded-left.padded-right {
+ background:transparent !important; background-image:none !important;
+ box-shadow:none !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+}
+body.wallaby-media-surface { isolation:isolate; background:transparent !important; }
+body.wallaby-media-surface::before {
+ content:''; position:fixed; inset:0; z-index:-2; pointer-events:none;
+ background:linear-gradient(90deg,rgba(15,8,25,.78),rgba(15,8,25,.5)),linear-gradient(0deg,rgba(15,8,25,.8),rgba(15,8,25,.25)),url('/native/branding/wallaby-popcorn-home-cinema.png') center / cover no-repeat;
+}
+body.wallaby-media-surface .backgroundContainer { background:transparent !important; }
+/* The toolbar is outside the items page in modern Jellyfin. Hide counters by role/location,
+   not by their changing text, without touching filter chips in dialogs or reset buttons. */
+body.wallaby-library-active .MuiToolbar-root.padded-left.padded-right .MuiChip-root,
+body.wallaby-library-active .MuiToolbar-root.padded-left.padded-right [data-testid="NavigateBeforeIcon"],
+body.wallaby-library-active .MuiToolbar-root.padded-left.padded-right [data-testid="NavigateNextIcon"],
+body.wallaby-library-active .listPaging,
+body.wallaby-library-active .pagingButtons,
+body.wallaby-library-active .paging { display:none !important; }
+/* Native cards remain as a bounded template/action source, never as a second visible list. */
+.wallaby-library-managed > .card, .wallaby-library-managed > .listItem { display:none !important; }
+.wallaby-library-managed { display:block !important; }
+.wallaby-virtual-library { width:100%; }
+.wallaby-virtual-grid { display:grid; gap:12px; align-items:start; }
+.wallaby-virtual-grid > .wallaby-virtual-card { width:100% !important; margin:0 !important; box-sizing:border-box; }
+.wallaby-virtual-native-list { display:block; }
+.wallaby-virtual-native-list > .wallaby-virtual-card { width:100% !important; margin:0 !important; box-sizing:border-box; }
+.wallaby-cinema-items > .card, .wallaby-cinema-items > .listItem { background:transparent !important; }
+.wallaby-cinema-items > .card .cardBox, .wallaby-cinema-items > .listItem .listItem-content { background:transparent !important; }
+.wallaby-cinema-items .wallaby-cinema-row { background:rgba(22,13,34,.18) !important; }
+.wallaby-cinema-items .wallaby-cinema-row:hover,
+.wallaby-cinema-items .wallaby-cinema-row:focus-visible { background:rgba(66,40,83,.35) !important; }
+.wallaby-cinema-items .wallaby-cinema-row.wallaby-cinema-selected { background:rgba(72,43,88,.55) !important; }
+.wallaby-cinema-row .wallaby-cinema-caption,
+.wallaby-cinema-row .wallaby-cinema-name,
+.wallaby-cinema-row .wallaby-cinema-year { background:transparent !important; }
+.wallaby-cinema-wallpaper { background:#160d22 url('/native/branding/wallaby-popcorn-home-cinema.png') center / cover no-repeat; }
+.wallaby-cinema-wallpaper img { position:absolute; inset:0; opacity:0; transition:opacity 700ms ease; }
+.wallaby-cinema-wallpaper img.wallaby-art-visible { opacity:.48; }
+@media(prefers-reduced-motion:reduce) { .wallaby-cinema-wallpaper img { transition:none; } }
+
+body.wallaby-library-active .MuiToolbar-root.padded-left.padded-right button[title="Previous"],
+body.wallaby-library-active .MuiToolbar-root.padded-left.padded-right button[title="Next"] { display:none !important; }
+
+.wallaby-page-size-setting { display:none !important; }
+body.wallaby-media-surface .skinBody, body.wallaby-home .homePage { background:transparent !important; }
+.wallaby-virtual-native-list > .wallaby-virtual-card { margin-bottom:12px !important; }
+
+.wallaby-cinema-wallpaper.wallaby-fanart-ready { background-image:none; }

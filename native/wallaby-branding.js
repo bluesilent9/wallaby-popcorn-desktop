@@ -31,6 +31,19 @@
     }
 
     function replaceBranding() {
+        const route = String(location.hash).replace(/^#!?\/?/, '').split('?')[0].replace(/\/$/, '');
+        const home = ['', 'home', 'home.html', 'index.html'].includes(route);
+        const library = /^(movies|tv|tvshows|list)$/.test(route);
+        const media = home || library || ['details', 'item', 'favorites', 'search'].includes(route);
+        if (document.body && document.body.classList.contains('wallaby-home') !== home) document.body.classList.toggle('wallaby-home', home);
+        if (document.body && document.body.classList.contains('wallaby-media-surface') !== media) document.body.classList.toggle('wallaby-media-surface', media);
+        if (document.body && document.body.classList.contains('wallaby-library-active') !== library) document.body.classList.toggle('wallaby-library-active', library);
+
+        document.querySelectorAll('[name="libraryPageSize"], #selectPageSize').forEach(control => {
+            const description = document.getElementById('display-settings-lib-pagesize-description');
+            const group = description?.closest('.MuiFormControl-root') || control.closest('.MuiFormControl-root, .selectContainer, .inputContainer');
+            if (group && !group.classList.contains('wallaby-page-size-setting')) group.classList.add('wallaby-page-size-setting');
+        });
         document.querySelectorAll('img[src], img[srcset], picture source[srcset]').forEach(image => {
             const kind = logoKind(image.getAttribute('src')) || image.dataset.wallabyLogo;
             if (kind) {
@@ -87,6 +100,7 @@
         attributes: true,
         attributeFilter: ['src', 'srcset', 'href', 'class', 'style'],
     });
+        window.addEventListener('hashchange', scheduleBranding);
         replaceBranding();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startBranding, { once: true });
