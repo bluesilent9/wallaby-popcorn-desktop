@@ -19,6 +19,8 @@ test('controller survives repeated view changes without repaint loops or stale o
  let nativeClicks=0,gearClicks=0;
  const openMenu=async()=>{
   w.document.getElementById('selectview-popover')?.remove();
+  // MUI Popover hides its sibling app tree from assistive technology, not visually.
+  w.document.querySelector('main').setAttribute('aria-hidden','true');
   const popup=w.document.createElement('div');popup.id='selectview-popover';
   popup.innerHTML='<ul role="menu"><li role="menuitem" tabindex="-1" class="MuiMenuItem-root" id="grid"><span class="MuiListItemIcon-root">✓</span>Grid View<button id="gear">Settings</button></li><div><ul role="menu"><li role="menuitem" id="nested">Image type</li></ul></div><li role="menuitem" tabindex="-1" class="MuiMenuItem-root" id="native-list"><span class="MuiListItemIcon-root"></span>List View</li></ul>';
   popup.querySelector('#gear').onclick=e=>{e.stopPropagation();gearClicks++};
@@ -48,6 +50,8 @@ test('controller survives repeated view changes without repaint loops or stale o
  assert.equal(w.document.querySelectorAll('.wallaby-cinema-detail').length,1);
  // Dismiss/reopen the native popup without duplicating or losing the active choice.
  const reopened=await openMenu();assert.ok(reopened.classList.contains('Mui-selected'));
+ w.document.getElementById('selectview-popover').remove();
+ w.document.querySelector('main').removeAttribute('aria-hidden');await tick();
  // Logout, another library, then return: preference remains scoped to this user/library.
  let user='user';w.ApiClient.getCurrentUserId=()=>user;
  user=null;w.dispatchEvent(new w.Event('focus'));await tick();
