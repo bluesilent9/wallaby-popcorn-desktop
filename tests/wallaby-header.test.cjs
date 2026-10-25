@@ -11,11 +11,23 @@ test('Home keeps the original server/account buttons and displays the logged-in 
  assert.equal(w.document.getElementById('wallaby-manage-server'),null,'styling must not grant admin permission');
  w.location.hash='#/movies?topParentId=movies';await new Promise(r=>setTimeout(r,80));assert.equal(w.document.querySelector('.wallaby-user-name'),null);
 });
-test('Home masks scrolling content behind the header, leaving header and wallpaper unmasked',{skip:!dependency},async t=>{
- const {JSDOM}=require(dependency),dom=new JSDOM('<header class="skinHeader">Server</header><main><div>Movie cards</div></main>',{url:'http://[::1]:8096/web/#/home',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window;let top=64;
- w.HTMLElement.prototype.getBoundingClientRect=function(){return this.tagName==='HEADER'?{top:0,bottom:64}:{top,bottom:900}};
+test('Home fades only a fixed header strip and leaves tall scrolling content unmasked',{skip:!dependency},async t=>{
+ const {JSDOM}=require(dependency),dom=new JSDOM('<header class="skinHeader">Server</header><main style="height:12000px"><div>Movie cards</div><div id="bottom">Last shelf</div></main>',{url:'http://[::1]:8096/web/#/home',runScripts:'outside-only',pretendToBeVisual:true});t.after(()=>dom.window.close());const w=dom.window;let top=64;
+ w.HTMLElement.prototype.getBoundingClientRect=function(){return this.tagName==='HEADER'?{top:0,bottom:64}:{top,bottom:top+12000}};
  w.wallabyNavigation={isHome:hash=>hash==='#/home'};w.eval(source('wallaby-artwork.js'));w.eval(source('wallaby-home.js'));const tick=()=>new Promise(r=>setTimeout(r,40));await tick();
- const main=w.document.querySelector('main');assert.ok(main.classList.contains('wallaby-home-content-fade'));assert.equal(main.style.getPropertyValue('--wallaby-fade-start'),'0px');
- top=-200;w.dispatchEvent(new w.Event('scroll'));await tick();assert.equal(main.style.getPropertyValue('--wallaby-fade-start'),'244px');assert.equal(main.style.getPropertyValue('--wallaby-fade-end'),'284px');assert.ok(!w.document.querySelector('header').classList.contains('wallaby-home-content-fade'));
- w.location.hash='#/movies';await tick();assert.ok(!main.classList.contains('wallaby-home-content-fade'));
+ const style=w.document.createElement('style');style.textContent=source('wallaby-popcorn.css');w.document.head.append(style);await tick();
+ const main=w.document.querySelector('main'),strip=w.document.querySelector('.wallaby-home-header-fade');
+ assert.ok(strip);assert.equal(strip.parentElement,w.document.body);assert.equal(strip.style.height,'84px');
+ assert.equal(w.getComputedStyle(strip).position,'fixed');assert.ok(w.getComputedStyle(strip).maskImage.includes('linear-gradient'));
+ assert.ok(!main.classList.contains('wallaby-home-content-fade'));
+ for(const node of [main,...main.querySelectorAll('*')]){
+  const css=w.getComputedStyle(node);assert.ok(!css.maskImage||css.maskImage==='none');
+  assert.ok(!css.transform||css.transform==='none');
+ }
+ const changes=[];new w.MutationObserver(records=>changes.push(...records)).observe(strip,{attributes:true,subtree:true,childList:true});
+ for(const offset of [-200,-1800,-9000]){top=offset;w.dispatchEvent(new w.Event('scroll'));await tick();assert.equal(strip.style.height,'84px');}
+ assert.equal(changes.length,0,'wheel scrolling must not rewrite the fade or shift wallpaper');
+ assert.equal(main.style.height,'12000px');assert.ok(w.document.getElementById('bottom').isConnected);
+ w.location.hash='#/movies';await tick();assert.equal(w.document.querySelector('.wallaby-home-header-fade'),null);
+ w.location.hash='#/home';await tick();assert.equal(w.document.querySelectorAll('.wallaby-home-header-fade').length,1);
 });
