@@ -66,7 +66,9 @@
 
     window.wallabyLibraryRoute = libraryRoute;
     let container, panel, selected, backdrop, backdropPage, selectedId = '', lastQuery = '', selectedIndex = 0, fadeCleanup, key = '', enabled = false, generation = 0, scheduled = false, opening = false;
-    const visible = node => node && node.getClientRects().length && !node.closest('.hide, [hidden], [aria-hidden="true"]');
+    // A modal's aria-hidden on the app root does not make the library invisible.
+    const layoutVisible = node => node && node.getClientRects().length && !node.closest('.hide, [hidden]');
+    const visible = node => layoutVisible(node) && !node.closest('[aria-hidden="true"]');
     const cards = () => container ? [...container.querySelectorAll('.card[data-id], .listItem[data-id], .wallaby-cinema-row[data-id]')] : [];
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
     function element(tag, className, text) {
@@ -368,10 +370,10 @@
         const user = client?.getCurrentUserId?.();
         const nextKey = library && user ? `wallaby.cinema.${client.serverAddress()}.${user}.${library}` : '';
         // Never apply to dashboard, search, home, genre shelves or playback overlays.
-        const candidates = nextKey ? [...document.querySelectorAll('.itemsContainer')].filter(node => visible(node) && node.querySelector('.card[data-id], .listItem[data-id]') &&
+        const candidates = nextKey ? [...document.querySelectorAll('.itemsContainer')].filter(node => layoutVisible(node) && node.querySelector('.card[data-id], .listItem[data-id]') &&
             !node.closest('.horizontalItemsContainer, .scrollSlider, .hide, [hidden]')) : [];
         const next = candidates.sort((a, b) => b.querySelectorAll('.card[data-id], .listItem[data-id]').length - a.querySelectorAll('.card[data-id], .listItem[data-id]').length)[0] ||
-            (container?.isConnected && visible(container) && key === nextKey ? container : null);
+            (container?.isConnected && layoutVisible(container) && key === nextKey ? container : null);
         if (!nextKey || !next) { if (container && (!nextKey || !container.isConnected)) cleanup(); return; }
         if (container !== next || key !== nextKey) {
             cleanup(); container = next; key = nextKey;
