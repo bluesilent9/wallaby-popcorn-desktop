@@ -172,10 +172,10 @@ body.wallaby-library-active .wallaby-cinema-detail {
 .wallaby-cinema-row:focus, .wallaby-virtual-card:focus { outline:2px solid var(--wallaby-teal); outline-offset:-2px; }
 .wallaby-cinema-open:focus { outline:2px solid var(--wallaby-teal); outline-offset:2px; }
 .wallaby-home-wallpaper { position:fixed; inset:0; z-index:-1; pointer-events:none; background:transparent; }
-.wallaby-home-wallpaper img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 700ms ease; }
-.wallaby-home-wallpaper img.wallaby-art-visible { opacity:1; }
-.wallaby-home-wallpaper::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,rgba(15,8,25,.78),rgba(15,8,25,.5)),linear-gradient(0deg,rgba(15,8,25,.8),rgba(15,8,25,.25)); }
-@media(prefers-reduced-motion:reduce) { .wallaby-home-wallpaper img { transition:none; } }
+.wallaby-home-wallpaper img, .wallaby-home-header-wallpaper img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 700ms ease; }
+.wallaby-home-wallpaper img.wallaby-art-visible, .wallaby-home-header-wallpaper img.wallaby-art-visible { opacity:1; }
+.wallaby-home-wallpaper::after, .wallaby-home-header-wallpaper::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,rgba(15,8,25,.78),rgba(15,8,25,.5)),linear-gradient(0deg,rgba(15,8,25,.8),rgba(15,8,25,.25)); }
+@media(prefers-reduced-motion:reduce) { .wallaby-home-wallpaper img, .wallaby-home-header-wallpaper img { transition:none; } }
 
 /* Home header: preserve the real server and account actions, simplify their presentation. */
 .wallaby-home-nav-hidden { display:none !important; }
@@ -186,10 +186,17 @@ body.wallaby-home .wallaby-user-box {
 }
 .wallaby-user-name { font:600 .95rem/1.25 'Noto Sans',sans-serif; text-transform:none; white-space:nowrap; }
 .wallaby-user-box .MuiAvatar-root { flex-shrink:0; }
-/* Mask content itself, keeping the header and wallpaper fully visible. */
-body.wallaby-home .wallaby-home-content-fade {
- mask-image:linear-gradient(to bottom,transparent var(--wallaby-fade-start,0px),#000 var(--wallaby-fade-end,20px));
- -webkit-mask-image:linear-gradient(to bottom,transparent var(--wallaby-fade-start,0px),#000 var(--wallaby-fade-end,20px));
+/* Cover only the header strip with the current viewport-aligned wallpaper.
+   The scrolling page remains unmasked so all rows can paint and lazy-load. */
+body.wallaby-home .skinHeader, body.wallaby-home .MuiAppBar-root { z-index:100 !important; }
+.wallaby-home-header-fade {
+ position:fixed; top:0; left:0; right:0; height:84px; z-index:99; pointer-events:none; overflow:hidden;
+ mask-image:linear-gradient(to bottom,#000 calc(100% - 20px),transparent);
+ -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 20px),transparent);
+}
+.wallaby-home-header-wallpaper {
+ position:absolute; top:0; left:0; width:100%; height:100vh;
+ background:url('/native/branding/wallaby-popcorn-home-cinema.png') center / cover no-repeat;
 }
 /* A single right-aligned library toolbar; native dropdown/filter/menu handlers stay in place. */
 .wallaby-library-toolbar { justify-content:flex-end !important; gap:.65rem; }
