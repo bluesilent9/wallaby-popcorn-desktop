@@ -20,5 +20,6 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, libseccomp2, systemd-resolved | sys
          qml6-module-qtqml-workerscript, qml6-module-qtquick-templates
 Recommends: qt6-wayland
 Description: Wallaby Popcorn desktop media client with built-in SSH tunnelling
- Independent Jellyfin Desktop fork with cinema library browsing and in-app
- access to the existing administrator dashboard. Rebuild on each Ubuntu release.
+ Independent Jellyfin Desktop fork with built-in IPv6 SSH tunnelling.
+ Displays the server-provided Jellyfin interface without client UI overrides.
+ Rebuild on each Ubuntu release.
