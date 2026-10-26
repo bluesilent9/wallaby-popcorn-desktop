@@ -1,9 +1,12 @@
-# Build handover
+# Current desktop build handover — revision8
 
-Accepted design: cinema list on the left and existing filters untouched; selected title's scraped full-screen fanart darkened behind the UI; poster, synopsis, technical media badges, subtitle language boxes and scraped original language on the right. Server dashboard design accepted separately; actual management pages remain supplied by Jellyfin.
+Restore the complete server-provided Jellyfin interface. No Wallaby client-side
+logo, CSS, Home/header/artwork, library view/paging or keyboard navigation overrides
+are injected or packaged. Historical scripts/previews are reference material only.
+App-owned icons, name and connection screen stay Wallaby Popcorn. Preserve existing
+SSH/IPv6 protections, native playback, migration and non-visual dashboard routing.
 
-Do not compile or create a DEB before the user reboots and authorizes the build. Initial target: Ubuntu 26.04 LTS amd64 only, one compiler job. The source is a Development fork of upstream v2.0.0. Mobile Stable/Development and all existing installations are unchanged.
-
-Prepared dependency prefix: `/home/dave/Documents/Codex/2026-10-24/i/work/desktop-deps/prefix-26.04`.
-
-No CMake configuration, C++ compilation, DEB generation, installation or runtime validation has been performed for this development desktop version.
+Stop before configure/compile/package until Dave reboots and authorizes building.
+Next package: 2.0.0-0wallaby8~ubuntu26.04 amd64 only, one compiler job.
+Prepared prefix: /home/dave/Documents/Codex/2026-10-24/i/work/desktop-deps/prefix-26.04
+See server-interface-restoration.md for scope and validation. No server UI changes.
