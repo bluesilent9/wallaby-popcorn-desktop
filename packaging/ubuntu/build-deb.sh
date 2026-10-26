@@ -11,7 +11,7 @@ source /etc/os-release
 jobs=${WALLABY_BUILD_JOBS:-1}
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || { echo 'WALLABY_BUILD_JOBS must be a positive integer.' >&2; exit 1; }
 version=$(tr -d '\n\r ' < "$repo/VERSION")
-package_version="${version}-0wallaby7~ubuntu${VERSION_ID}"
+package_version="${version}-0wallaby8~ubuntu${VERSION_ID}"
 resolver_package=systemd-resolved
 [[ $VERSION_ID != 22.04 ]] || resolver_package=systemd
 build="$repo/build-ubuntu-${VERSION_ID}-amd64"
@@ -63,8 +63,8 @@ Depends: $shlibs, openssh-client, python3, libseccomp2, $resolver_package, qml6-
 Recommends: qt6-wayland
 Installed-Size: $(du -sk "$stage/usr" | cut -f1)
 Description: Wallaby Popcorn desktop media client with built-in SSH tunnelling
- Independent Jellyfin Desktop fork with Wallaby branding, a cinema library view
- and in-app access to the existing administrator dashboard.
+ Independent Jellyfin Desktop fork with built-in IPv6 SSH tunnelling.
+ Displays the server-provided Jellyfin interface without client UI overrides.
  Built for Ubuntu $VERSION_ID amd64. Rebuild on other supported Ubuntu releases.
 CONTROL
 output="$repo/dist/wallaby-popcorn_${package_version}_amd64.deb"
