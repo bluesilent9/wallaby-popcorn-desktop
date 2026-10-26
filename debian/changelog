@@ -1,3 +1,13 @@
+wallaby-popcorn (2.0.0-0wallaby8) UNRELEASED; urgency=medium
+
+  * Restore the unmodified server-provided Jellyfin web interface; retire client
+    layout, artwork, branding, paging and navigation overrides.
+  * Preserve app-owned Wallaby icons/connection screen, native playback and
+    existing IPv6 SSH/network protections and profile migration.
+  * Retain non-visual same-origin dashboard routing without adding UI controls.
+
+ -- Wallaby Suite <bluesilent9@users.noreply.github.com>  Mon, 26 Oct 2026 22:00:00 +1100
+
 wallaby-popcorn (2.0.0-0wallaby7) UNRELEASED; urgency=medium
 
   * Keep Standard View available while the native popover applies aria-hidden
