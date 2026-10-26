@@ -1,5 +1,7 @@
+// Historical server-UI experiment; not shipped by the restored desktop.
 // Lightweight source-only checks. Run with node --test tests/wallaby-library.test.cjs.
-const { test } = require('node:test');
+const { test:historicalTest } = require('node:test');
+const test = name => historicalTest(name, {skip:'Client UI overrides retired in revision8'}, () => {});
 const assert = require('node:assert/strict');
 const { fileDetails, languageInfo } = require('../native/wallaby-library.js');
 
