@@ -55,6 +55,21 @@ add_library(jmp_core STATIC ${ALL_SRCS})
 
 file(GLOB_RECURSE RESOURCE_FILES ${CMAKE_SOURCE_DIR}/resources/*)
 file(GLOB_RECURSE NATIVE_FILES ${CMAKE_SOURCE_DIR}/native/*)
+# Historical web-UI experiments remain in Git for future server-side work, but
+# are neither embedded nor injected into the desktop client.
+set(SERVER_UI_OVERRIDES
+  wallaby-branding.js wallaby-library-paging.js wallaby-artwork.js
+  wallaby-navigation.js wallaby-home.js wallaby-library.js wallaby-popcorn.css
+)
+set(NATIVE_RESOURCE_ARGS)
+foreach(NATIVE_FILE IN LISTS NATIVE_FILES)
+  file(RELATIVE_PATH NATIVE_RELATIVE ${CMAKE_SOURCE_DIR}/native ${NATIVE_FILE})
+  if(NATIVE_RELATIVE IN_LIST SERVER_UI_OVERRIDES)
+    continue()
+  endif()
+  list(APPEND NATIVE_RESOURCE_ARGS "/web-client/extension/${NATIVE_RELATIVE}=${NATIVE_FILE}")
+endforeach()
+
 
 # generate resources.qrc from directory tree listings
 add_custom_command(OUTPUT resources.qrc
@@ -62,7 +77,7 @@ add_custom_command(OUTPUT resources.qrc
           ${CMAKE_CURRENT_BINARY_DIR}/resources.qrc
           /=${CMAKE_SOURCE_DIR}/resources/
           ui/webview.qml=${CMAKE_SOURCE_DIR}/src/ui/webview.qml
-          /web-client/extension=${CMAKE_SOURCE_DIR}/native/
+          ${NATIVE_RESOURCE_ARGS}
   COMMENT "Creating resources.qrc"
   DEPENDS ${CMAKE_SOURCE_DIR}/scripts/build-qt-resources.py
     ${RESOURCE_FILES}
