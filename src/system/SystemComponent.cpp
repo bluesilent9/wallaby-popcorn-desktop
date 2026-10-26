@@ -923,26 +923,6 @@ QString SystemComponent::getNativeShellScript()
   }
   clientData.insert("mode", QJsonValue::fromVariant(defaultMode));
 
-  auto assetData = [](const QString& path, const QByteArray& mime) -> QString {
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) return QString();
-    return "data:" + QString::fromLatin1(mime) + ";base64," + QString::fromLatin1(file.readAll().toBase64());
-  };
-  QJsonObject branding;
-  branding.insert("homeBackdrop", assetData(":/web-client/extension/branding/wallaby-popcorn-home-cinema.png", "image/png"));
-  branding.insert("mark", assetData(":/web-client/extension/branding/wallaby-popcorn-mark.png", "image/png"));
-  branding.insert("lightWordmark", assetData(":/web-client/extension/branding/wallaby-popcorn-wordmark-light.svg", "image/svg+xml"));
-  branding.insert("darkWordmark", assetData(":/web-client/extension/branding/wallaby-popcorn-wordmark-dark.svg", "image/svg+xml"));
-  QFile cssFile(":/web-client/extension/wallaby-popcorn.css");
-  if (cssFile.open(QIODevice::ReadOnly)) {
-    QString css = QString::fromUtf8(cssFile.readAll());
-    css.replace("/native/branding/wallaby-popcorn-home-cinema.png", branding.value("homeBackdrop").toString());
-    css.replace("/native/wallaby-popcorn-mark.png", branding.value("mark").toString());
-    css.replace("/native/wallaby-popcorn-wordmark-light.svg", branding.value("lightWordmark").toString());
-    branding.insert("css", css);
-  }
-  clientData.insert("branding", branding);
-
   QVariantList settingsDescriptionsList = SettingsComponent::Get().settingDescriptions();
   QVariantMap settingsDescriptions = QVariantMap();
   for (auto setting : settingsDescriptionsList) {
@@ -974,13 +954,8 @@ QString SystemComponent::getNativeShellScript()
     ":/web-client/extension/updatePlugin.js",
     ":/web-client/extension/connectivityHelper.js",
     ":/web-client/extension/nativeshell.js",
-    ":/web-client/extension/wallaby-branding.js",
-    ":/web-client/extension/wallaby-desktop.js",
-    ":/web-client/extension/wallaby-library-paging.js",
-    ":/web-client/extension/wallaby-artwork.js",
-    ":/web-client/extension/wallaby-navigation.js",
-    ":/web-client/extension/wallaby-home.js",
-    ":/web-client/extension/wallaby-library.js"
+    // Non-visual same-origin dashboard routing; no server UI overrides.
+    ":/web-client/extension/wallaby-desktop.js"
   };
 
   cachedScript = jmpInfoDeclaration;
