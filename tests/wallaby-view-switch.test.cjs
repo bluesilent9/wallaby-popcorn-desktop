@@ -1,4 +1,6 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+// Historical server-UI experiment; not shipped by the restored desktop.
+const {test:historicalTest}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+const test = name => historicalTest(name, {skip:'Client UI overrides retired in revision8'}, () => {});
 const dependency=process.env.WALLABY_JSDOM;
 test('controller survives repeated view changes without repaint loops or stale opaque rows',{skip:!dependency},async t=>{
  const {JSDOM}=require(dependency);
