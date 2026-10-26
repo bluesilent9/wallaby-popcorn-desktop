@@ -7,17 +7,15 @@ The separate [Android fork](https://github.com/bluesilent9/wallaby-popcorn) foll
 ## Changes
 
 - Existing working `ssh://user@host:port` integration retained from the earlier Kubuntu Flatpak. OpenSSH resolves IPv6 hostnames, pins the host key after explicit fingerprint confirmation, owns its tunnel process, and forwards only to the server's loopback Jellyfin port. Existing installed server enrollment helpers are reused. No Wallaby Agent service is needed for this app's tunnel.
-- Wallaby Popcorn app identity, the Android Development artwork, transparent in-app mascot and adaptive light/dark wordmarks. Original upstream legal attribution remains.
-- An administrator-only **Manage server** button opens the authenticated server's own dashboard inside the app, over the existing connection. Server authorization remains authoritative. Ordinary external links continue to open externally.
-- Optional **Cinema list** on movie/TV library pages: existing titles/year list, filters, sorting and item controls, with selected artwork, synopsis and technical information. Full-screen faded backdrop/fanart is supplied by the server. Video resolution/codec, audio format/channels/bitrate/sample rate and subtitle language badges use media stream data. **Original language uses scraped `OriginalLanguage` metadata only**; missing data is marked rather than guessed from file audio or metadata scraping preferences.
-- Continuation beyond the initial native library page reuses the captured, matched Jellyfin query and every filter/sort option. Requests are 100 items each; extra rows are virtualized and eight pages cached. Unrecognized server renderers retain native paging instead of guessing a query. Integration needs validation against the live server after compilation.
+- Wallaby Popcorn app identity, launcher/window icons and the app-owned connection screen retain their artwork. The server's own logos, theme, Home page, libraries, menus, artwork, pagination and navigation are displayed without Wallaby client-side overrides.
+- Existing native media-player integration, IPv6-only networking and same-origin dashboard link routing remain. The client does not add dashboard buttons or change server permissions.
 - First launch of the DEB copies existing Flatpak profiles, WebEngine sessions and app-owned SSH identities/pins into the new per-user data directory, when no new profile directory exists. The old Flatpak must be closed; its original data is preserved. No private user data is included in this source repository.
 
 ## Prepare and build
 
 See [Ubuntu packaging](docs/ubuntu-build.md). **No compilation is part of preflight.** Run `packaging/ubuntu/build-deb.sh --build` only after the requested reboot/build authorization. The default is one compiler job. Only Ubuntu **26.04 LTS amd64** is the initial build target.
 
-See [previews](previews/README.md) for browser-only design previews with synthetic content. The dashboard preview is representative; the running app uses the server's real dashboard.
+See [restoration details](docs/server-interface-restoration.md). The old [previews](previews/README.md) are historical design references for later server-side work and are not the current desktop interface.
 
 ## Upstream and licenses
 
