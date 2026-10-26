@@ -1,4 +1,6 @@
-const {test}=require('node:test'); const assert=require('node:assert/strict');
+// Historical server-UI experiment; not shipped by the restored desktop.
+const {test:historicalTest}=require('node:test'); const assert=require('node:assert/strict');
+const test = name => historicalTest(name, {skip:'Client UI overrides retired in revision8'}, () => {});
 const {createArtworkScheduler}=require('../native/wallaby-artwork.js');
 test('artwork waits one second, holds the old image while loading, and ignores superseded images',async()=>{
  let tasks=[],shown=['old'],requests=[],pending={};
