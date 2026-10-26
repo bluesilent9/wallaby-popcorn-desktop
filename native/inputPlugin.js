@@ -28,7 +28,6 @@ class inputPlugin {
 
             api.input.hostInput.connect((actions) => {
                 actions.forEach(action => {
-                    if (window.wallabyNavigation?.command(action)) return;
                     if (action === 'shuffle') {
                         playbackManager.setQueueShuffleMode('Shuffle');
                     } else if (action === 'sorted') {
